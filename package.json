@@ -1,0 +1,19 @@
+{
+  "name": "meu-servidor-haxball",
+  "version": "1.0.0",
+  "description": "Bot Haxball para Pterodactyl",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "buffer": "^6.0.3",
+    "express": "^5.1.0",
+    "form-data": "^4.0.2",
+    "haxball.js": "^3.0.0",
+    "node-fetch": "^2.7.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
