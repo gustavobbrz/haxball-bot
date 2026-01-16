@@ -1,36 +1,53 @@
 const { spawn } = require('child_process');
-const http = require('http');
+const path = require('path');
 
-// === MANTÉM O PAINEL ONLINE (Porta 8000) ===
-const PORT = process.env.SERVER_PORT || 8000;
-http.createServer((req, res) => {
-    res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('HaxHosting Multi-System Online');
-}).listen(PORT, () => console.log(`[SYSTEM] Painel Online na porta ${PORT}`));
-
-// === CONFIGURAÇÃO DOS PROCESSOS ===
+// === LISTA DE SALAS PARA INICIAR ===
 const bots = [
-    { file: 'sala1.js', name: 'DONO 01 (Sala 1)' },
-    { file: 'sala2.js', name: 'DONO 02 (Sala 2)' }
+    { 
+        file: 'sala1.js', 
+        name: 'SALA 01 (Principal)' 
+    },
+    { 
+        file: 'sala2.js', 
+        name: 'SALA 02 (Secundária)' 
+    },
 ];
 
+const START_DELAY = 10000; // 10 segundos entre cada sala
+
 function startBot(botConfig) {
-    console.log(`[SYSTEM] Iniciando ${botConfig.name}...`);
+    console.log(`[GERENCIADOR] Iniciando processo: ${botConfig.name}...`);
     
-    // Inicia o processo isolado
     const child = spawn('node', [botConfig.file], {
-        cwd: __dirname,
-        stdio: 'inherit',
-        env: process.env
+        cwd: __dirname, 
+        stdio: 'inherit' 
     });
 
     child.on('close', (code) => {
-        console.error(`[ALERTA] ${botConfig.name} caiu (Código ${code}).`);
-        console.log(`[SYSTEM] Reiniciando ${botConfig.name} em 5s...`);
+        console.error(`[ALERTA] ${botConfig.name} caiu/fechou (Código ${code}).`);
+        console.log(`[GERENCIADOR] Reiniciando ${botConfig.name} em 5 segundos...`);
         setTimeout(() => startBot(botConfig), 5000);
+    });
+    
+    child.on('error', (err) => {
+        console.error(`[ERRO FATAL] Não foi possível iniciar ${botConfig.name}:`, err);
     });
 }
 
-// Inicia as duas salas com intervalo para não bugar a conexão
-startBot(bots[0]);
-setTimeout(() => startBot(bots[1]), 10000);
+async function initSystem() {
+    console.log("==========================================");
+    console.log("   GERENCIADOR HAXBALL (BASEADO NA AZZURASHIN)   ");
+    console.log("==========================================");
+
+    for (let i = 0; i < bots.length; i++) {
+        startBot(bots[i]);
+        
+        if (i < bots.length - 1) {
+            console.log(`[GERENCIADOR] Aguardando ${START_DELAY/1000}s para a próxima...`);
+            await new Promise(r => setTimeout(r, START_DELAY));
+        }
+    }
+    console.log("[GERENCIADOR] Todas as salas foram acionadas.");
+}
+
+initSystem();
