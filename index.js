@@ -293,7 +293,7 @@ HaxballJS().then((HBInit) => {
       }
       
       if (message === "!discord") {
-        room.sendAnnouncement("🔗 Entre no nosso Discord: (Configure o Link)", player.id, 0x7289da, "bold", 1);
+        room.sendAnnouncement("🔗 Entre no nosso Discord: https://discord.gg/tVWmwXjjWx", player.id, 0x7289da, "bold", 1);
         return false;
       }
       
@@ -443,3 +443,4 @@ HaxballJS().then((HBInit) => {
       saveStats();
     };
 });
+
