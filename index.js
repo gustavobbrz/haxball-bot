@@ -1,62 +1,82 @@
-// HAXHOSTING UNIVERSAL SCRIPT v1.0
 const HaxballJS = require("haxball.js");
-const fetch = require("node-fetch");
 const express = require("express");
 const fs = require("fs");
-const FormData = require("form-data");
-const { Buffer } = require("buffer");
 const path = require("path");
 
-// Carrega .env se existir (apenas para testes locais)
-try { require('dotenv').config(); } catch(e) {}
+let config;
+try { config = require("./config.json"); } catch (e) { console.error("Missing config.json - copy config.json.example to config.json and fill tokens."); process.exit(1); }
 
-// CONFIGURAÇÕES (VÊM DO PAINEL)
-const TOKEN = process.env.HB_TOKEN; 
-const ROOM_NAME = process.env.HB_ROOM_NAME || "HaxHosting Server";
-const MAX_PLAYERS = parseInt(process.env.HB_MAX_PLAYERS) || 20;
-const PUBLIC_ROOM = process.env.HB_PUBLIC !== "false"; 
-const ADMIN_PASSWORD = process.env.HB_ADMIN_PASSWORD || "123456";
-const GEO = { 
-    code: process.env.HB_GEO_CODE || "BR", 
-    lat: parseFloat(process.env.HB_GEO_LAT) || -23.5505, 
-    lon: parseFloat(process.env.HB_GEO_LON) || -46.6333 
-};
-const WEB_PORT = process.env.SERVER_PORT || 3000;
-const WEBHOOK_CHAT = process.env.HB_WEBHOOK_CHAT;
-const WEBHOOK_REPLAY = process.env.HB_WEBHOOK_REPLAY;
+const carregarLogicaFutsal = require("./src/futsal.js");
 
-// INICIALIZAÇÃO
-HaxballJS.then((HBInit) => {
-  const room = HBInit({
-    roomName: ROOM_NAME,
-    maxPlayers: MAX_PLAYERS,
-    public: PUBLIC_ROOM,
-    noPlayer: true,
-    token: TOKEN,
-    geo: GEO
-  });
+const app = express();
+app.use(express.json());
 
-  // WEB SERVER (STATUS)
-  const app = express();
+const roomsMap = new Map();
+
+async function main() {
+  const HBInit = await HaxballJS();
+
+  for (const rcfg of (config.rooms || [])) {
+    if (!rcfg.token || rcfg.token === "vazio") {
+      console.log(`[ROOM ${rcfg.id}] Pulada: Sem token.`);
+      continue;
+    }
+
+    const room = HBInit({
+      roomName: rcfg.roomName || `Futsal #${rcfg.id}`,
+      maxPlayers: rcfg.maxPlayers || 30,
+      public: rcfg.public !== false,
+      geo: rcfg.geo || undefined,
+      token: rcfg.token,
+      noPlayer: true,
+      puppeteer: { args: ['--no-sandbox', '--disable-setuid-sandbox'], headless: true }
+    });
+
+    roomsMap.set(rcfg.id, room);
+    carregarLogicaFutsal(room, rcfg.id, config);
+
+    room.onRoomLink = (link) => console.log(`[ROOM ${rcfg.id}] ONLINE: ${link}`);
+  }
+
   app.get("/status", (req, res) => {
-      res.json({
-          online: true,
-          name: ROOM_NAME,
-          players: room.getPlayerList().length,
-          max: MAX_PLAYERS,
-          link: `https://www.haxball.com/play?c=${room.getKey()}`
+    try {
+      const out = [];
+      roomsMap.forEach((room, id) => {
+        const players = (room.getPlayerList() || []).filter(p => p && p.id !== 0);
+        out.push({ id, players: players.length });
       });
+      res.status(200).json({ online: true, rooms: out });
+    } catch (err) { res.status(500).json({ online: false }); }
   });
-  app.listen(WEB_PORT, () => console.log(`[HaxHosting] WebServer on port ${WEB_PORT}`));
 
-  // EVENTOS BÁSICOS
-  room.onRoomLink = (link) => console.log(`[HaxHosting] Sala: ${link}`);
-  room.onPlayerJoin = (p) => room.sendAnnouncement(`Bem-vindo à ${ROOM_NAME}, ${p.name}!`, p.id, 0x00FF00, "bold");
-  room.onPlayerChat = (p, m) => {
-      if(m.startsWith("!admin ") && m.split(" ")[1] === ADMIN_PASSWORD) {
-          room.setPlayerAdmin(p.id, true);
-          return false;
+  app.post("/discord-chat", (req, res) => {
+    try {
+      const { roomId, author, message } = req.body;
+      const room = roomsMap.get(roomId);
+      if (!room) return res.status(404).send({ error: "Sala não encontrada" });
+      room.sendAnnouncement(`[💬 Discord] ${author}: ${message}`, null, 0xffff00, "bold", 0);
+      res.status(200).send({ status: "ok" });
+    } catch (error) { res.status(500).send({ error: "Erro interno" }); }
+  });
+
+  app.post("/admin-command", (req, res) => {
+    try {
+      const auth = req.headers.authorization;
+      if (auth !== `Bearer ${config.adminSecret}`) return res.status(403).send({ error: "Acesso negado" });
+      const { roomId, command } = req.body;
+      const room = roomsMap.get(roomId);
+      if (!room) return res.status(404).send({ error: "Sala não encontrada" });
+
+      if (command === "clearbans") {
+        try { room.clearBans(); } catch (e) {}
+        return res.status(200).send({ message: "Sucesso" });
       }
-      return true;
-  };
-});
+      res.status(400).send({ error: "Comando desconhecido" });
+    } catch (e) { res.status(500).send({ error: "Erro" }); }
+  });
+
+  const port = config.port || 3002;
+  app.listen(port, () => console.log(`API rodando na porta ${port}`));
+}
+
+main().catch(err => { console.error(err); process.exit(1); });
