@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 const fs = require("fs");
 const path = require("path");
 const fetch = require("node-fetch");
@@ -11,6 +10,7 @@ module.exports = function carregarLogicaFutsal(room, salaId, config) {
 
     const AVATAR_URL_CHAT = "https://media.discordapp.net/attachments/1374313154099810355/1400601050377097267/1000055589-removebg-preview.png";
     const AVATAR_URL_LOGS = "https://media.discordapp.net/attachments/1374313154099810355/1400601050377097267/1000055589-removebg-preview.png";
+    const AVATAR_URL_REPLAY = AVATAR_URL_LOGS;
 
     const webhooks = (config && config.webhooks && config.webhooks[salaId]) || {
         denuncia: null,
@@ -178,8 +178,7 @@ module.exports = function carregarLogicaFutsal(room, salaId, config) {
         if (player.admin) {
             if (message === "!trocarlado") { const all = room.getPlayerList(); const r = all.filter(p => p.team === 1); const b = all.filter(p => p.team === 2); r.forEach(p => room.setPlayerTeam(p.id, 2)); b.forEach(p => room.setPlayerTeam(p.id, 1)); room.sendAnnouncement(`🔄 Times trocados por ${player.name}!`, null, 0x00ff00, "bold", 1); return false; }
             if (message === "!rr") { room.stopGame(); setTimeout(() => room.startGame(), 100); return false; }
-            if (message.startsWith("!ban ")) { const tid = parseInt(message.split(" ")[1].replace("#", "")); const tp = room.getPlayer(tid); if (tp) { const r = message.split(" ").slice(2).join(" ") || "Banido por admin"; bannedPlayers.set(tp.conn, { name: tp.name, banTime: Date.now() }); room.kickPlayer(tp.id, r, true); const bm = `⛔ ${tp.name} banido por ${player.name}. Motivo: ${r}`; room.sendAnnouncement(bm, null, 0xff0000, "bold"); if (webhooks.banlog) sendToWebhook(webhooks.banlog, "Punições", `
-\`\`\`\n${bm}\n\`\`\`\n`, AVATAR_URL_LOGS); } else room.sendAnnouncement("Jogador não encontrado.", player.id, 0xffcc00); return false; }
+            if (message.startsWith("!ban ")) { const tid = parseInt(message.split(" ")[1].replace("#", "")); const tp = room.getPlayer(tid); if (tp) { const r = message.split(" ").slice(2).join(" ") || "Banido por admin"; bannedPlayers.set(tp.conn, { name: tp.name, banTime: Date.now() }); room.kickPlayer(tp.id, r, true); const bm = `⛔ ${tp.name} banido por ${player.name}. Motivo: ${r}`; room.sendAnnouncement(bm, null, 0xff0000, "bold"); if (webhooks.banlog) sendToWebhook(webhooks.banlog, "Punições", `\`\`\`${bm}\`\`\``, AVATAR_URL_LOGS); } else room.sendAnnouncement("Jogador não encontrado.", player.id, 0xffcc00); return false; }
             if (message.startsWith("!unban ")) { const tname = message.split(" ").slice(1).join(" "); let fConn = null; for (const [c, b] of bannedPlayers.entries()) { if (b.name.toLowerCase() === tname.toLowerCase()) { fConn = c; break; } } if (fConn) { bannedPlayers.delete(fConn); try { room.clearBan(fConn); } catch (e) {} const ubm = `✅ ${tname} desbanido por ${player.name}.`; room.sendAnnouncement(ubm, null, 0x00ff00, "bold"); if (webhooks.banlog) sendToWebhook(webhooks.banlog, "Punições", `\`\`\`${ubm}\`\`\``, AVATAR_URL_LOGS); } else room.sendAnnouncement(`\"${tname}\" não encontrado nos bans.`, player.id, 0xffcc00); return false; }
             if (message === "!limpar") { room.clearBans(); bannedPlayers.clear(); const cm = `🧹 Bans limpos por ${player.name}.`; room.sendAnnouncement(cm, null, 0x00ff00, "bold"); if (webhooks.banlog) sendToWebhook(webhooks.banlog, "Punições", `\`\`\`${cm}\`\`\``, AVATAR_URL_LOGS); return false; }
             if (message === "!puxarbola" || message === "!pb") { if (player.position) { room.setDiscProperties(0, { x: player.position.x, y: player.position.y, xspeed: 0, yspeed: 0 }); room.sendAnnouncement("⚽ Bola puxada!", player.id, 0x00ff00, "bold", 0); } return false; }
@@ -193,99 +192,4 @@ module.exports = function carregarLogicaFutsal(room, salaId, config) {
     room.onGameStart = function () { Rposs = 0; Bposs = 0; lastScores = null; redPlayers = room.getPlayerList().filter(p => p.team === 1).map(p => p.name); bluePlayers = room.getPlayerList().filter(p => p.team === 2).map(p => p.name); startRecording(); };
 
     room.onGameStop = function () { lastScores = room.getScores(); sendReplayToDiscord(); if (lastScores && lastScores.time > 0) { if (lastScores.red === lastScores.blue) room.sendAnnouncement(`🤝 FIM DE JOGO! Empate em ${lastScores.red} a ${lastScores.blue}!`, null, 0xffd700, "bold", 2); else { const w = lastScores.red > lastScores.blue ? "Time Vermelho 🔴" : "Time Azul 🔵"; room.sendAnnouncement(`🏆 FIM DE JOGO! Vitória do ${w} por ${lastScores.red} a ${lastScores.blue}!`, null, 0xffd700, "bold", 2); } } };
-=======
-const fetch = require("node-fetch");
-const FormData = require("form-data");
-const { Buffer } = require("buffer");
-
-module.exports = function carregarLogicaFutsal(room, salaId, config) {
-    // Configurações extraídas do seu bot antigo
-    const AVATAR_URL_CHAT = "https://media.discordapp.net/attachments/1374313154099810355/1400601050377097267/1000055589-removebg-preview.png";
-    const AVATAR_URL_LOGS = "https://media.discordapp.net/attachments/1374313154099810355/1400601050377097267/1000055589-removebg-preview.png";
-    
-    // Webhooks originais do seu script
-    const webhooks = {
-        denuncia: "https://discord.com/api/webhooks/1400982738068045935/5nXz0KKLb0V5ySLt_Az_wDh5i1qK6P1FnjnpirKzpG5BqZv2Q0HzwM4J-G31iM4l-Od_",
-        chat: "https://discord.com/api/webhooks/1365152273184985169/Wo_ETJCgNDWxXZrCG-eLnVB0nHVrgn2qeuh14r80iRpgxd425Z3zHlykYHr2h45UHJmb",
-        join: "https://discord.com/api/webhooks/1354919498788110449/z8op1r_NHfN2zmkou8MDW2TFADGBgUuZqcH24Wy0KqszeEuUbAnqMst8wOoJ416xd-D8"
-    };
-
-    let officialAdms = [];
-    let bannedPlayers = new Map();
-
-    // Função de Webhook profissional
-    async function sendToWebhook(url, username, content, avatarUrl) {
-        if (!content) return;
-        fetch(url, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ username: `${username} | Sala ${salaId}`, content, avatar_url: avatarUrl })
-        }).catch(e => console.error("Erro Webhook:", e));
-    }
-
-    // --- EVENTOS DA SALA ---
-
-    room.onPlayerJoin = function (player) {
-        room.sendAnnouncement(`👋🏼 Bem-vindo(a) à arena, ${player.name}!`, player.id, 0x00ff00, "bold", 1);
-        
-        // Log de entrada profissional
-        const msg = "```" + `📝 Entrada Sala ${salaId}\nNick: ${player.name}\nConn: ${player.conn}` + "```";
-        sendToWebhook(webhooks.join, "Logs de Entrada", msg, AVATAR_URL_LOGS);
-
-        // Mensagem automática de autoria (ajustada para 5s como no original)
-        setTimeout(() => {
-            room.sendAnnouncement("🤖 Bot Profissional desenvolvido por Billy. Bug? Discord: @backsidekickflip", player.id, 0x00ffff, "normal", 0);
-        }, 5000);
-
-        if (room.getPlayerList().filter(p => p.id !== 0).length === 1) room.setPlayerAdmin(player.id, true);
-    };
-
-    room.onPlayerChat = function (player, message) {
-        message = message.trim();
-
-        // Comandos de Jogador
-        if (message === "!discord") {
-            room.sendAnnouncement("🔗 Discord: https://discord.gg/ApkbpMSdTa", player.id, 0x7289da, "bold");
-            return false;
-        }
-
-        if (message === "!ajuda") {
-            room.sendAnnouncement("📜 !discord, !sair, !denunciar <nick> <motivo>", player.id, 0xffffff);
-            if (player.admin) room.sendAnnouncement("⭐ Admin: !rr, !trocarlado, !pb, !limpar", player.id, 0xffcc00);
-            return false;
-        }
-
-        // Sistema de Denúncia via Webhook
-        if (message.startsWith("!denunciar ")) {
-            sendToWebhook(webhooks.denuncia, "🚨 DENÚNCIA", `**${player.name}** denunciou alguém na Sala ${salaId}.\nMotivo: ${message.slice(11)}`, AVATAR_URL_LOGS);
-            room.sendAnnouncement("✅ Denúncia enviada aos administradores.", player.id, 0x00ff00);
-            return false;
-        }
-
-        // Comandos de Admin
-        if (player.admin) {
-            if (message === "!rr") { room.stopGame(); setTimeout(() => room.startGame(), 100); return false; }
-            if (message === "!pb" || message === "!puxarbola") {
-                if (player.position) room.setDiscProperties(0, { x: player.position.x, y: player.position.y, xspeed: 0, yspeed: 0 });
-                return false;
-            }
-            if (message === "!trocarlado") {
-                room.getPlayerList().forEach(p => { if(p.team !== 0) room.setPlayerTeam(p.id, p.team === 1 ? 2 : 1); });
-                return false;
-            }
-        }
-
-        // Log de Chat para o Discord
-        if (!message.startsWith("!")) {
-            sendToWebhook(webhooks.chat, `Chat Sala ${salaId}`, `**${player.name}**: ${message}`, AVATAR_URL_CHAT);
-        }
-
-        return true;
-    };
-
-    room.onTeamGoal = function (team) {
-        const scores = room.getScores();
-        room.sendAnnouncement(`⚽ GOL! [ ${scores.red} - ${scores.blue} ]`, null, 0xffffff, "bold");
-    };
->>>>>>> fd5a9074e104487ef4960c56bbba10020d0ae2cf
 };
