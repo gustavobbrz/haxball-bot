@@ -1,5 +1,31 @@
+const { fork } = require('child_process');
+
+// =================================================================
+// 🤖 SISTEMA ANTI-ERRO (GERENCIADOR DE MULTI-PROCESSOS)
+// =================================================================
+// Isso impede o erro "Can't init twice" criando um processo separado para cada sala.
+if (!process.env.IS_CHILD_PROCESS) {
+    console.log("🛠️ [SISTEMA] Iniciando gerenciador de salas...");
+
+    // Inicia Sala 1 (Com WebServer)
+    const p1 = fork(__filename, [], { 
+        env: { ...process.env, IS_CHILD_PROCESS: 'true', CURRENT_ROOM_ID: '1' } 
+    });
+    
+    // Inicia Sala 2 (Sem WebServer para não dar erro de porta duplicada)
+    const p2 = fork(__filename, [], { 
+        env: { ...process.env, IS_CHILD_PROCESS: 'true', CURRENT_ROOM_ID: '2' } 
+    });
+
+    p1.on('exit', (code) => console.log(`⚠️ Sala 1 caiu (Código ${code})`));
+    p2.on('exit', (code) => console.log(`⚠️ Sala 2 caiu (Código ${code})`));
+
+    // Mantém o mestre rodando
+    return;
+}
+
 // ===============================================================
-// === SCRIPT MULTI-SALA - VERSÃO CORRIGIDA (ADMIN SEPARADO) ===
+// === ABAIXO ESTÁ O SEU CÓDIGO ORIGINAL (MANTIDO) ===
 // ===============================================================
 
 const HaxballJS = require("haxball.js");
@@ -13,8 +39,11 @@ const path = require("path");
 // ---------------------------------------------------------------
 // CONFIGURAÇÃO GLOBAL (Webhooks e Senhas Compartilhadas)
 // ---------------------------------------------------------------
-const STATS_FILE_PATH = path.join(__dirname, "dd_stats.json");
-const STATUS_MONITOR_FILE_PATH = path.join(__dirname, "status_dd.json");
+// Ajuste para cada sala ter seu próprio arquivo de stats para não dar conflito
+const fileSuffix = process.env.CURRENT_ROOM_ID === '2' ? '_sala2' : '';
+const STATS_FILE_PATH = path.join(__dirname, `dd_stats${fileSuffix}.json`);
+const STATUS_MONITOR_FILE_PATH = path.join(__dirname, `status_dd${fileSuffix}.json`);
+
 const WEBHOOK_PORT = process.env.SERVER_PORT || 8000;
 const ADMIN_SECRET_KEY = process.env.ADMIN_KEY || "8962926258";
 
@@ -81,7 +110,7 @@ function loadStats() {
                 tempMap.set(playerName, statsArray);
             }
             stats = tempMap;
-            console.log(`[STATS] Carregadas com sucesso.`);
+            console.log(`[STATS] Carregadas com sucesso (Sala ${process.env.CURRENT_ROOM_ID}).`);
         } else {
             console.log("[STATS] Arquivo novo criado.");
             stats = new Map();
@@ -99,7 +128,7 @@ async function iniciarBot(configToken, configName, configMaxPlayers, configPubli
     
     // 1. Verificação de Segurança
     if (!configToken || configToken.trim() === "") {
-        if (isSecondary) console.log(`[INFO] Sala Secundária não configurada. Ignorando...`);
+        if (isSecondary) console.log(`[INFO] Sala Secundária não configurada ou Token ausente.`);
         else console.error(`[ERRO] Token da Sala Principal ausente! Verifique o Painel.`);
         return;
     }
@@ -221,6 +250,7 @@ async function iniciarBot(configToken, configName, configMaxPlayers, configPubli
             console.log(`✅ ${roomName} ONLINE | Link: ${link}`);
             currentRoomLink = link;
             
+            // Salva status apenas se for sala 1 para não conflitar escrita
             if (!isSecondary) {
                 setInterval(() => {
                     try {
@@ -423,68 +453,70 @@ async function iniciarBot(configToken, configName, configMaxPlayers, configPubli
 }
 
 // ===============================================================
-// 🚀 INICIALIZAÇÃO DAS SALAS (CORRIGIDO)
+// 🚀 INICIALIZAÇÃO CONTROLADA PELO GERENCIADOR
 // ===============================================================
 
-// Sala 1 (Configuração Padrão)
-// Params: Token, Nome, MaxPlayers, Public, AdminPass, RoomPass, isSecondary
-iniciarBot(
-    process.env.HAXBALL_TOKEN, 
-    process.env.ROOM_NAME, 
-    process.env.MAX_PLAYERS, 
-    process.env.PUBLIC, 
-    process.env.ADMIN_PASS, // Senha Admin Sala 1
-    process.env.ROOM_PASS,  // Senha Sala 1
-    false
-);
+// Verifica qual sala este processo deve abrir
+if (process.env.CURRENT_ROOM_ID === '1') {
+    // === PROCESSO DA SALA 1 (PRINCIPAL) ===
+    iniciarBot(
+        process.env.HAXBALL_TOKEN, 
+        process.env.ROOM_NAME, 
+        process.env.MAX_PLAYERS, 
+        process.env.PUBLIC, 
+        process.env.ADMIN_PASS, 
+        process.env.ROOM_PASS, 
+        false
+    );
 
-// Sala 2 (Configuração Secundária)
-iniciarBot(
-    process.env.HAXBALL_TOKEN_2, 
-    process.env.ROOM_NAME_2, 
-    process.env.MAX_PLAYERS_2, 
-    process.env.PUBLIC, 
-    process.env.ADMIN_PASS_2, // Senha Admin Sala 2
-    process.env.PASSWORD_2,   // Senha Sala 2 (Entrada)
-    true
-);
+    // ===============================================================
+    // 🌐 SERVIDOR EXPRESS (SÓ RODA NA SALA 1 PARA NÃO DAR ERRO DE PORTA)
+    // ===============================================================
+    const app = express();
+    app.use(express.json());
 
+    app.get('/', (req, res) => res.send('Bots Haxball Rodando!'));
 
-// ===============================================================
-// 🌐 SERVIDOR EXPRESS (Controla Webhooks para AMBAS as salas)
-// ===============================================================
-const app = express();
-app.use(express.json());
-
-app.get('/', (req, res) => res.send('Bots Haxball Rodando!'));
-
-// Webhook para mandar msg do Discord para as salas
-app.post("/discord-chat", (req, res) => {
-    const { author, message } = req.body;
-    if (!author || !message) return res.status(400).send({ error: "Faltando dados" });
-    
-    // Manda para TODAS as salas ativas
-    activeRooms.forEach(room => {
-        try {
-            room.sendAnnouncement(`[💬 Discord] ${author}: ${message}`, null, 0xffff00, "bold", 0);
-        } catch (e) { console.error("Erro enviando msg Discord para sala:", e); }
-    });
-    res.status(200).send({ status: "ok" });
-});
-
-// Comandos de Admin via Webhook
-app.post("/admin-command", (req, res) => {
-    const { authorization } = req.headers;
-    const { command, author } = req.body;
-    if (authorization !== `Bearer ${ADMIN_SECRET_KEY}`) return res.status(403).send({ error: "Acesso negado" });
-    
-    if (command === "clearbans") {
+    // Webhook para mandar msg do Discord para as salas (SÓ VAI FUNCIONAR NA SALA 1)
+    app.post("/discord-chat", (req, res) => {
+        const { author, message } = req.body;
+        if (!author || !message) return res.status(400).send({ error: "Faltando dados" });
+        
         activeRooms.forEach(room => {
-            room.clearBans();
-            room.sendAnnouncement(`🧹 Todos os bans removidos remotamente por ${author}.`, null, 0x00ff00, "bold");
+            try {
+                room.sendAnnouncement(`[💬 Discord] ${author}: ${message}`, null, 0xffff00, "bold", 0);
+            } catch (e) { console.error("Erro enviando msg Discord para sala:", e); }
         });
-        res.status(200).send({ message: "Sucesso em todas as salas" });
-    } else res.status(400).send({ error: "Comando desconhecido" });
-});
+        res.status(200).send({ status: "ok" });
+    });
 
-app.listen(WEBHOOK_PORT, () => console.log(`[SERVER] Webserver rodando na porta ${WEBHOOK_PORT}`));
+    // Comandos de Admin via Webhook
+    app.post("/admin-command", (req, res) => {
+        const { authorization } = req.headers;
+        const { command, author } = req.body;
+        if (authorization !== `Bearer ${ADMIN_SECRET_KEY}`) return res.status(403).send({ error: "Acesso negado" });
+        
+        if (command === "clearbans") {
+            activeRooms.forEach(room => {
+                room.clearBans();
+                room.sendAnnouncement(`🧹 Todos os bans removidos remotamente por ${author}.`, null, 0x00ff00, "bold");
+            });
+            res.status(200).send({ message: "Sucesso na Sala 1" });
+        } else res.status(400).send({ error: "Comando desconhecido" });
+    });
+
+    app.listen(WEBHOOK_PORT, () => console.log(`[SERVER] Webserver rodando na porta ${WEBHOOK_PORT}`));
+
+} else if (process.env.CURRENT_ROOM_ID === '2') {
+    // === PROCESSO DA SALA 2 (SECUNDÁRIA) ===
+    iniciarBot(
+        process.env.HAXBALL_TOKEN_2, 
+        process.env.ROOM_NAME_2, 
+        process.env.MAX_PLAYERS_2, 
+        process.env.PUBLIC, 
+        process.env.ADMIN_PASS_2, 
+        process.env.PASSWORD_2, 
+        true
+    );
+    // Sala 2 não roda o Express para não dar "Porta 8000 já em uso"
+}
