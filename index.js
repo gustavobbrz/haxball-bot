@@ -1,5 +1,5 @@
 // ===============================================================
-// === SCRIPT FUTSAL DO DD 24HRS - VERSÃO PTERODACTYL EGG ===
+// === SCRIPT FUTSAL DO DD 24HRS - VERSÃO PTERODACTYL EGG (INTEGRAL) ===
 // ===============================================================
 
 const HaxballJS = require("haxball.js");
@@ -11,13 +11,21 @@ const { Buffer } = require("buffer");
 const path = require("path");
 
 // ---------------------------------------------------------------
-// CONFIGURAÇÃO GERAL (AGORA VIA VARIÁVEIS DE AMBIENTE)
+// CONFIGURAÇÃO GERAL (VIA VARIÁVEIS DE AMBIENTE)
 // ---------------------------------------------------------------
 // Se o painel não mandar nada, usa os valores padrão (após o ||)
 const roomName = process.env.ROOM_NAME || "⚫️🟣 FUTSAL DO REDLEY 24HRS 🟣⚫️";
 const maxPlayers = parseInt(process.env.MAX_PLAYERS) || 30;
 const roomPublic = process.env.PUBLIC === "false" ? false : true; // Padrão é true
 const token = process.env.HAXBALL_TOKEN; // O Token TEM que vir do painel
+
+// === NOVAS VARIÁVEIS DO EGG (O PEDIDO DO CLIENTE) ===
+// 1. Senha da Sala (Se estiver vazio no painel, fica null/pública)
+const roomPassword = process.env.ROOM_PASS ? process.env.ROOM_PASS : null;
+
+// 2. Senha de Admin Principal (Substitui o antigo !gus3210)
+// Se o cliente não configurar nada, o padrão vira !virardono
+const adminCommand = process.env.ADMIN_PASS || "!virardono";
 
 // Geo Location (Padrão BR se não especificado)
 const geo = { 
@@ -116,6 +124,7 @@ HaxballJS().then((HBInit) => {
       roomName, 
       maxPlayers, 
       public: roomPublic, 
+      password: roomPassword, // <--- AQUI A MÁGICA: Senha configurada via Painel
       geo, 
       token, 
       noPlayer: true,
@@ -253,7 +262,13 @@ HaxballJS().then((HBInit) => {
     }
 
     room.onRoomLink = function (link) {
-      console.log("Sala criada (DD)! Link: " + link);
+      console.log("========================================");
+      console.log(`✅ SALA ONLINE (DD)`);
+      console.log(`🔗 Link: ${link}`);
+      console.log(`🔐 Senha da Sala: ${roomPassword ? "ATIVA" : "PÚBLICA"}`);
+      console.log(`👑 Comando Admin: ${adminCommand}`);
+      console.log("========================================");
+
       room.setDefaultStadium("Big");
       room.setTimeLimit(3);
       room.setScoreLimit(3);
@@ -328,7 +343,7 @@ HaxballJS().then((HBInit) => {
         return false;
       }
 
-      if (message === "!bb" || message === "!sair") {
+      if (message === "!bb" || message === "!BB") {
         room.kickPlayer(player.id, "Saiu da sala a pedido.", false);
         return false;
       }
@@ -349,14 +364,18 @@ HaxballJS().then((HBInit) => {
         return false;
       }
 
-      if (message === "!gus3210") {
+      // === ATENÇÃO: AQUI FOI ALTERADO PARA USAR A VARIÁVEL DO PAINEL ===
+      if (message === adminCommand) {
         if (!officialAdms.includes(player.name)) officialAdms.push(player.name);
         if (!reiniColor.includes(player.name)) reiniColor.push(player.name);
         room.setPlayerAdmin(player.id, true);
         room.sendAnnouncement(`👑 ${player.name}, Fundador autenticado!`, null, 0xffd700, "bold", 2);
-        sendToWebhook(logWebhookURL, "Logs Admin", "```" + `[👑] [FUNDADOR] ${player.name} logou.` + "```", AVATAR_URL_LOGS);
+        sendToWebhook(logWebhookURL, "Logs Admin", "```" + `[👑] [FUNDADOR] ${player.name} logou (Painel).` + "```", AVATAR_URL_LOGS);
         return false;
-      } else if (message === "!igor1") {
+      } 
+      // === FIM DA ALTERAÇÃO (O RESTO ABAIXO SEGUE ORIGINAL) ===
+
+      else if (message === "!igor1") {
         room.setPlayerAdmin(player.id, true);
         room.sendAnnouncement(`⭐ ${player.name}, Admin autenticado!`, null, 0x00bfff, "bold", 2);
         sendToWebhook(logWebhookURL, "Logs Admin", "```" + `[⭐] [ADMIN] ${player.name} logou.` + "```", AVATAR_URL_LOGS);
