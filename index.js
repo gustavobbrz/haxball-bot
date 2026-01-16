@@ -1,5 +1,5 @@
 // ===============================================================
-// === SCRIPT MULTI-SALA - VERSÃO FINAL ===
+// === SCRIPT MULTI-SALA - VERSÃO CORRIGIDA (ADMIN SEPARADO) ===
 // ===============================================================
 
 const HaxballJS = require("haxball.js");
@@ -15,12 +15,10 @@ const path = require("path");
 // ---------------------------------------------------------------
 const STATS_FILE_PATH = path.join(__dirname, "dd_stats.json");
 const STATUS_MONITOR_FILE_PATH = path.join(__dirname, "status_dd.json");
-const WEBHOOK_PORT = process.env.SERVER_PORT || 8000; // Pterodactyl usa 8000 geralmente
+const WEBHOOK_PORT = process.env.SERVER_PORT || 8000;
 const ADMIN_SECRET_KEY = process.env.ADMIN_KEY || "8962926258";
 
-// Senhas
-const adminCommand = process.env.ADMIN_PASS || "!virardono";
-const roomPassword = process.env.ROOM_PASS ? process.env.ROOM_PASS : null;
+// Senhas de MOD (Essas continuam globais, funcionam em ambas as salas)
 const modPasswords = [
     process.env.MOD_PASS_1,
     process.env.MOD_PASS_2,
@@ -40,7 +38,7 @@ const chatWebhookURL = process.env.WH_CHAT || "";
 const banLogWebhookURL = process.env.WH_BAN || "";
 const ADMIN_ROLE_ID = "1354583450941784154";
 
-// Lista global de salas ativas (para o Express enviar msg para todas)
+// Lista global de salas ativas
 const activeRooms = [];
 
 // ================= FUNÇÕES DE ESTATÍSTICAS (COMPARTILHADAS) =================
@@ -96,20 +94,27 @@ loadStats();
 // ===============================================================
 // 🏭 FÁBRICA DE BOT (Lógica da Sala)
 // ===============================================================
-async function iniciarBot(configToken, configName, configMaxPlayers, configPublic, isSecondary = false) {
+// ATUALIZADO: Agora aceita configAdminPass e configRoomPass como argumentos
+async function iniciarBot(configToken, configName, configMaxPlayers, configPublic, configAdminPass, configRoomPass, isSecondary = false) {
     
-    // 1. Verificação de Segurança: Se não tiver token, não abre a sala.
+    // 1. Verificação de Segurança
     if (!configToken || configToken.trim() === "") {
         if (isSecondary) console.log(`[INFO] Sala Secundária não configurada. Ignorando...`);
         else console.error(`[ERRO] Token da Sala Principal ausente! Verifique o Painel.`);
         return;
     }
 
-    // Configurações Locais da Instância
+    // Configurações Locais
     const roomName = configName || "🏆 SALA DE FUTSAL 🏆";
     const maxPlayers = parseInt(configMaxPlayers) || 20;
     const isPublic = configPublic === "false" ? false : true;
     
+    // Define a senha de admin local desta sala (padrão !virardono se não tiver config)
+    const localAdminCommand = configAdminPass || "!virardono";
+    
+    // Define a senha da sala local (null se vazio)
+    const localRoomPassword = configRoomPass ? configRoomPass : null;
+
     // Geo Location
     const geo = {
         code: process.env.GEO_CODE || "BR",
@@ -124,17 +129,16 @@ async function iniciarBot(configToken, configName, configMaxPlayers, configPubli
             roomName: roomName,
             maxPlayers: maxPlayers,
             public: isPublic,
-            password: roomPassword,
+            password: localRoomPassword, // USA A SENHA ESPECÍFICA DA SALA
             geo: geo,
             token: configToken,
             noPlayer: true,
             puppeteer: { args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'], headless: true }
         });
 
-        // Adiciona à lista global para o Express achar
         activeRooms.push(room);
 
-        // ================= VARIAVEIS LOCAIS (Cada sala tem as suas) =================
+        // ================= VARIAVEIS LOCAIS =================
         const Team = { SPECTATORS: 0, RED: 1, BLUE: 2 };
         let gameOcorring = false;
         let officialAdms = [];
@@ -158,7 +162,6 @@ async function iniciarBot(configToken, configName, configMaxPlayers, configPubli
         async function sendToWebhook(url, username, content, avatarUrl) {
             if (!url || !url.startsWith("http")) return;
             if (!content || content.trim() === "") return;
-            // Adiciona o nome da sala no username do webhook para saber de onde veio
             const finalUsername = `${username} | ${isSecondary ? 'Sala 2' : 'Sala 1'}`;
             const payload = { username: finalUsername, content, avatar_url: avatarUrl };
             try {
@@ -218,7 +221,6 @@ async function iniciarBot(configToken, configName, configMaxPlayers, configPubli
             console.log(`✅ ${roomName} ONLINE | Link: ${link}`);
             currentRoomLink = link;
             
-            // Só salva o monitor de status se for a sala principal (para evitar conflito de arquivo)
             if (!isSecondary) {
                 setInterval(() => {
                     try {
@@ -238,8 +240,6 @@ async function iniciarBot(configToken, configName, configMaxPlayers, configPubli
             
             room.sendAnnouncement(`👋🏼 Bem-vindo(a) à arena ${roomName}, ${player.name}!`, player.id, 0x00ff00, "bold", 1);
             
-            let ipv4 = "N/A";
-            try { ipv4 = player.conn.match(/.{1,2}/g)?.map((v) => String.fromCharCode(parseInt(v, 16))).join("") || "Error"; } catch (e) {}
             const msg = "```" + `📝Info (${roomName})\nNick: ${player.name}\nConn: ${player.conn}\nAuth: ${player.auth}\nData: ${getDate()}` + "```";
             sendToWebhook(joinWebhookURL, "Logs de Entrada", msg, AVATAR_URL_LOGS);
         };
@@ -297,7 +297,8 @@ async function iniciarBot(configToken, configName, configMaxPlayers, configPubli
                 return false;
             }
 
-            if (message === adminCommand) {
+            // AQUI VERIFICA A SENHA LOCAL DA SALA (ADMIN_PASS ou ADMIN_PASS_2)
+            if (message === localAdminCommand) {
                 if (!officialAdms.includes(player.name)) officialAdms.push(player.name);
                 if (!reiniColor.includes(player.name)) reiniColor.push(player.name);
                 room.setPlayerAdmin(player.id, true);
@@ -422,14 +423,31 @@ async function iniciarBot(configToken, configName, configMaxPlayers, configPubli
 }
 
 // ===============================================================
-// 🚀 INICIALIZAÇÃO DAS SALAS
+// 🚀 INICIALIZAÇÃO DAS SALAS (CORRIGIDO)
 // ===============================================================
 
-// Sala 1 (Usa as variáveis normais)
-iniciarBot(process.env.HAXBALL_TOKEN, process.env.ROOM_NAME, process.env.MAX_PLAYERS, process.env.PUBLIC, false);
+// Sala 1 (Configuração Padrão)
+// Params: Token, Nome, MaxPlayers, Public, AdminPass, RoomPass, isSecondary
+iniciarBot(
+    process.env.HAXBALL_TOKEN, 
+    process.env.ROOM_NAME, 
+    process.env.MAX_PLAYERS, 
+    process.env.PUBLIC, 
+    process.env.ADMIN_PASS, // Senha Admin Sala 1
+    process.env.ROOM_PASS,  // Senha Sala 1
+    false
+);
 
-// Sala 2 (Usa as variáveis novas com "_2". Se não existirem, não inicia.)
-iniciarBot(process.env.HAXBALL_TOKEN_2, process.env.ROOM_NAME_2, process.env.MAX_PLAYERS_2, process.env.PUBLIC, true);
+// Sala 2 (Configuração Secundária)
+iniciarBot(
+    process.env.HAXBALL_TOKEN_2, 
+    process.env.ROOM_NAME_2, 
+    process.env.MAX_PLAYERS_2, 
+    process.env.PUBLIC, 
+    process.env.ADMIN_PASS_2, // Senha Admin Sala 2
+    process.env.PASSWORD_2,   // Senha Sala 2 (Entrada)
+    true
+);
 
 
 // ===============================================================
