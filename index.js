@@ -1,5 +1,5 @@
 // ===============================================================
-// === SCRIPT CORRIGIDO - VERSÃO FINAL ===
+// === SCRIPT MULTI-SALA - VERSÃO FINAL ===
 // ===============================================================
 
 const HaxballJS = require("haxball.js");
@@ -11,37 +11,23 @@ const { Buffer } = require("buffer");
 const path = require("path");
 
 // ---------------------------------------------------------------
-// CONFIGURAÇÃO GERAL
+// CONFIGURAÇÃO GLOBAL (Webhooks e Senhas Compartilhadas)
 // ---------------------------------------------------------------
-const roomName = process.env.ROOM_NAME || "🏆 SALA DE FUTSAL 🏆";
-const maxPlayers = parseInt(process.env.MAX_PLAYERS) || 30;
-const roomPublic = process.env.PUBLIC === "false" ? false : true; 
-const token = process.env.HAXBALL_TOKEN; 
+const STATS_FILE_PATH = path.join(__dirname, "dd_stats.json");
+const STATUS_MONITOR_FILE_PATH = path.join(__dirname, "status_dd.json");
+const WEBHOOK_PORT = process.env.SERVER_PORT || 8000; // Pterodactyl usa 8000 geralmente
+const ADMIN_SECRET_KEY = process.env.ADMIN_KEY || "8962926258";
 
-// === SENHAS E COMANDOS ===
-const roomPassword = process.env.ROOM_PASS ? process.env.ROOM_PASS : null;
+// Senhas
 const adminCommand = process.env.ADMIN_PASS || "!virardono";
-
+const roomPassword = process.env.ROOM_PASS ? process.env.ROOM_PASS : null;
 const modPasswords = [
     process.env.MOD_PASS_1,
     process.env.MOD_PASS_2,
     process.env.MOD_PASS_3
 ].filter(pass => pass && pass.trim() !== "");
 
-// Geo Location
-const geo = { 
-    code: process.env.GEO_CODE || "BR", 
-    lat: parseFloat(process.env.GEO_LAT) || -23.51, 
-    lon: parseFloat(process.env.GEO_LON) || -46.64 
-};
-
-// Configurações Internas
-const WEBHOOK_PORT = process.env.SERVER_PORT || 3003; 
-const STATS_FILE_PATH = path.join(__dirname, "dd_stats.json"); 
-const STATUS_MONITOR_FILE_PATH = path.join(__dirname, "status_dd.json");
-const ADMIN_SECRET_KEY = process.env.ADMIN_KEY || "8962926258";
-
-// =================== WEBHOOKS & ID ===================
+// Webhooks
 const AVATAR_URL_CHAT = "https://media.discordapp.net/attachments/1374313154099810355/1400601050377097267/1000055589-removebg-preview.png";
 const AVATAR_URL_LOGS = AVATAR_URL_CHAT;
 const AVATAR_URL_REPLAY = AVATAR_URL_CHAT;
@@ -52,395 +38,435 @@ const joinWebhookURL = process.env.WH_JOIN || "";
 const replayWebhookURL = process.env.WH_REPLAY || "";
 const chatWebhookURL = process.env.WH_CHAT || "";
 const banLogWebhookURL = process.env.WH_BAN || "";
-
 const ADMIN_ROLE_ID = "1354583450941784154";
 
-// ================= FUNÇÕES DE ESTATÍSTICAS =================
+// Lista global de salas ativas (para o Express enviar msg para todas)
+const activeRooms = [];
+
+// ================= FUNÇÕES DE ESTATÍSTICAS (COMPARTILHADAS) =================
 const SsEnumForSave = { WI: 1, LS: 2, DR: 3, GL: 5, AS: 6, CS: 8 };
 var stats;
 
 function saveStats() {
-  if (!stats) return;
-  try {
-    const statsObject = {};
-    for (let [key, value] of stats.entries()) {
-      statsObject[key] = {
-        wins: value[SsEnumForSave.WI] || 0,
-        losses: value[SsEnumForSave.LS] || 0,
-        draws: value[SsEnumForSave.DR] || 0,
-        goals: value[SsEnumForSave.GL] || 0,
-        assists: value[SsEnumForSave.AS] || 0,
-        cleanSheets: value[SsEnumForSave.CS] || 0,
-      };
-    }
-    fs.writeFileSync(STATS_FILE_PATH, JSON.stringify(statsObject, null, 2), "utf8");
-  } catch (error) { console.error("[STATS] Erro salvar:", error.message); }
+    if (!stats) return;
+    try {
+        const statsObject = {};
+        for (let [key, value] of stats.entries()) {
+            statsObject[key] = {
+                wins: value[SsEnumForSave.WI] || 0,
+                losses: value[SsEnumForSave.LS] || 0,
+                draws: value[SsEnumForSave.DR] || 0,
+                goals: value[SsEnumForSave.GL] || 0,
+                assists: value[SsEnumForSave.AS] || 0,
+                cleanSheets: value[SsEnumForSave.CS] || 0,
+            };
+        }
+        fs.writeFileSync(STATS_FILE_PATH, JSON.stringify(statsObject, null, 2), "utf8");
+    } catch (error) { console.error("[STATS] Erro salvar:", error.message); }
 }
 
 function loadStats() {
-  try {
-    if (fs.existsSync(STATS_FILE_PATH)) {
-      const data = fs.readFileSync(STATS_FILE_PATH, "utf8");
-      const statsObject = JSON.parse(data);
-      const tempMap = new Map();
-      for (let playerName in statsObject) {
-        const pStats = statsObject[playerName];
-        const statsArray = Array(20).fill(0); 
-        statsArray[SsEnumForSave.WI] = pStats.wins || 0;
-        statsArray[SsEnumForSave.LS] = pStats.losses || 0;
-        statsArray[SsEnumForSave.DR] = pStats.draws || 0;
-        statsArray[SsEnumForSave.GL] = pStats.goals || 0;
-        statsArray[SsEnumForSave.AS] = pStats.assists || 0;
-        statsArray[SsEnumForSave.CS] = pStats.cleanSheets || 0;
-        tempMap.set(playerName, statsArray);
-      }
-      stats = tempMap;
-      console.log(`[STATS] Carregadas com sucesso.`);
-    } else { 
-        console.log("[STATS] Arquivo novo criado."); 
-        stats = new Map(); 
-        saveStats();
-    }
-  } catch (error) { console.error("[STATS] Erro carregar:", error.message); stats = new Map(); }
+    try {
+        if (fs.existsSync(STATS_FILE_PATH)) {
+            const data = fs.readFileSync(STATS_FILE_PATH, "utf8");
+            const statsObject = JSON.parse(data);
+            const tempMap = new Map();
+            for (let playerName in statsObject) {
+                const pStats = statsObject[playerName];
+                const statsArray = Array(20).fill(0);
+                statsArray[SsEnumForSave.WI] = pStats.wins || 0;
+                statsArray[SsEnumForSave.LS] = pStats.losses || 0;
+                statsArray[SsEnumForSave.DR] = pStats.draws || 0;
+                statsArray[SsEnumForSave.GL] = pStats.goals || 0;
+                statsArray[SsEnumForSave.AS] = pStats.assists || 0;
+                statsArray[SsEnumForSave.CS] = pStats.cleanSheets || 0;
+                tempMap.set(playerName, statsArray);
+            }
+            stats = tempMap;
+            console.log(`[STATS] Carregadas com sucesso.`);
+        } else {
+            console.log("[STATS] Arquivo novo criado.");
+            stats = new Map();
+            saveStats();
+        }
+    } catch (error) { console.error("[STATS] Erro carregar:", error.message); stats = new Map(); }
 }
-
-// ---------------------------------------------------------------
-// INICIALIZAÇÃO
-// ---------------------------------------------------------------
-if (!token) {
-    console.error("ERRO: Token ausente. Verifique Startup.");
-    process.exit(1);
-}
-
 loadStats();
 
-// CORREÇÃO AQUI: Adicionado () após HaxballJS
-HaxballJS().then((HBInit) => {
-    const room = HBInit({
-      roomName, maxPlayers, public: roomPublic, password: roomPassword, geo, token, noPlayer: true,
-      puppeteer: { args: ['--no-sandbox', '--disable-setuid-sandbox'], headless: true }
-    });
-
-    const app = express();
-    app.use(express.json());
-
-    // --- ROTAS DO WEBHOOK ---
-    app.get("/status", (req, res) => {
-        if (room) {
-            const playersList = (room.getPlayerList() || []).filter((p) => p.id !== 0);
-            return res.status(200).json({ online: true, roomName, players: playersList.length, maxPlayers, uptime: Math.floor(process.uptime()) });
-        }
-        res.status(500).json({ online: false });
-    });
-
-    app.post("/discord-chat", (req, res) => {
-      const { author, message } = req.body;
-      if (!author || !message) return res.status(400).send({ error: "Faltando dados" });
-      room.sendAnnouncement(`[💬 Discord] ${author}: ${message}`, null, 0xffff00, "bold", 0);
-      res.status(200).send({ status: "ok" });
-    });
-
-    app.post("/admin-command", (req, res) => {
-      const { authorization } = req.headers;
-      const { command, author } = req.body;
-      if (authorization !== `Bearer ${ADMIN_SECRET_KEY}`) return res.status(403).send({ error: "Acesso negado" });
-      
-      if (command === "clearbans") {
-          room.clearBans();
-          bannedPlayers.clear();
-          const clearMsg = `🧹 Todos os bans foram removidos por admin via Discord (${author}).`;
-          room.sendAnnouncement(clearMsg, null, 0x00ff00, "bold");
-          sendToWebhook(banLogWebhookURL, "Sistema Punição", `\`\`\`${clearMsg}\`\`\``, AVATAR_URL_LOGS);
-          res.status(200).send({ message: "Sucesso" });
-      } else res.status(400).send({ error: "Comando desconhecido" });
-    });
-
-    app.listen(WEBHOOK_PORT, () => console.log(`[SERVER] Rodando na porta ${WEBHOOK_PORT}`));
-
-    // VARIAVEIS DE JOGO
-    const Team = { SPECTATORS: 0, RED: 1, BLUE: 2 };
-    var gameOcorring = false;
-    var officialAdms = [];
-    var playersConn = {};
-    var reiniColor = [];
-    let prefixTeamChatStringss = "t ";
-
-    let lastScores = null;
-    let Rposs = 0; let Bposs = 0;
-    let gameRecording = { active: false };
-    let redPlayers = []; let bluePlayers = [];
-    let bannedPlayers = new Map();
-    let currentRoomLink = null;
-
-    room.setTeamsLock(true);
-
-    function initPlayerStats(player) {
-      if (!stats.has(player.name)) stats.set(player.name, Array(20).fill(0));
-    }
-
-    async function sendToWebhook(url, username, content, avatarUrl) {
-      if (!url || !url.startsWith("http")) return;
-      if (!content || content.trim() === "") return;
-      const payload = { username, content, avatar_url: avatarUrl };
-      try {
-          await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-      } catch (error) { console.error(`Erro Webhook:`, error.message); }
-    }
-
-    function getDate() {
-      let d = new Date();
-      return `${d.getDate()}-${d.getMonth() + 1}-${d.getFullYear()} ${d.getHours()}h${d.getMinutes()}m`;
-    }
+// ===============================================================
+// 🏭 FÁBRICA DE BOT (Lógica da Sala)
+// ===============================================================
+async function iniciarBot(configToken, configName, configMaxPlayers, configPublic, isSecondary = false) {
     
-    function customTime(time) {
-      const totalSeconds = Math.trunc(time);
-      return `${Math.floor(totalSeconds / 60)}m${String(totalSeconds % 60).padStart(2, "0")}s`;
+    // 1. Verificação de Segurança: Se não tiver token, não abre a sala.
+    if (!configToken || configToken.trim() === "") {
+        if (isSecondary) console.log(`[INFO] Sala Secundária não configurada. Ignorando...`);
+        else console.error(`[ERRO] Token da Sala Principal ausente! Verifique o Painel.`);
+        return;
     }
 
-    function startRecording() {
-      if (gameRecording.active) return;
-      try { room.startRecording(); gameRecording.active = true; } catch (e) { console.error("Erro rec:", e); }
-    }
-
-    async function sendReplayToDiscord() {
-      if (!gameRecording.active) return;
-      const replayData = room.stopRecording();
-      gameRecording.active = false;
-      if (!replayData || replayData.byteLength < 50) return;
-      if (!replayWebhookURL || !replayWebhookURL.startsWith("http")) return;
-
-      const sc = lastScores || room.getScores() || { red: 0, blue: 0, time: 0 };
-      const fileName = `Replay-${getDate().replace(/\s/g, '_')}.hbr2`;
-      const rP = (Rposs + Bposs > 0) ? ((Rposs / (Rposs+Bposs)) * 100).toFixed(1) : "0.0";
-      const bP = (Rposs + Bposs > 0) ? ((Bposs / (Rposs+Bposs)) * 100).toFixed(1) : "0.0";
-
-      const payload_json = JSON.stringify({
-        username: "📹 REPLAY DA PARTIDA", avatar_url: AVATAR_URL_REPLAY, content: "A gravação da partida foi finalizada!",
-        embeds: [{
-            color: 0x2b2d31, title: roomName, description: "Estatísticas:", footer: { text: `Partida de ${getDate()}` },
-            fields: [
-              { name: `🔴 Time Vermelho`, value: `**Placar:** ${sc.red}\n**Jogadores:**\n${redPlayers.join("\n") || "-"}`, inline: true },
-              { name: `🔵 Time Azul`, value: `**Placar:** ${sc.blue}\n**Jogadores:**\n${bluePlayers.join("\n") || "-"}`, inline: true },
-              { name: "⏱️ Tempo", value: `\`${customTime(sc.time)}\``, inline: true },
-              { name: "📊 Posse", value: `\`\`\`diff\n+ Red: ${rP}%\n- Blue: ${bP}%\`\`\``, inline: false },
-            ]
-        }]
-      });
-
-      const form = new FormData();
-      form.append("payload_json", payload_json);
-      form.append("file", Buffer.from(replayData), { filename: fileName, contentType: "application/octet-stream" });
-
-      try { await fetch(replayWebhookURL, { method: "POST", body: form }); } catch (error) { console.error("Erro replay:", error); }
-    }
-
-    room.onRoomLink = function (link) {
-      console.log(`✅ SALA ONLINE | Link: ${link}`);
-      currentRoomLink = link;
-      setInterval(() => { 
-          try { 
-             const players = room.getPlayerList().filter((p) => p.id !== 0); 
-             fs.writeFileSync(STATUS_MONITOR_FILE_PATH, JSON.stringify({ playerCount: players.length, maxPlayers, roomLink: currentRoomLink, lastUpdate: new Date().toISOString() }, null, 2)); 
-          } catch (e) {} 
-      }, 15000);
+    // Configurações Locais da Instância
+    const roomName = configName || "🏆 SALA DE FUTSAL 🏆";
+    const maxPlayers = parseInt(configMaxPlayers) || 20;
+    const isPublic = configPublic === "false" ? false : true;
+    
+    // Geo Location
+    const geo = {
+        code: process.env.GEO_CODE || "BR",
+        lat: parseFloat(process.env.GEO_LAT) || -23.51,
+        lon: parseFloat(process.env.GEO_LON) || -46.64
     };
 
-    room.onPlayerJoin = function (player) {
-      console.log(`Entrou: ${player.name}`);
-      initPlayerStats(player);
-      playersConn[player.name] = player.conn;
-      
-      // Auto Admin se for o primeiro
-      if (room.getPlayerList().filter((p) => p.id !== 0).length === 1) room.setPlayerAdmin(player.id, true);
-      
-      room.sendAnnouncement(`👋🏼 Bem-vindo(a) à arena ${roomName}, ${player.name}!`, player.id, 0x00ff00, "bold", 1);
-      
-      // Log Join
-      let ipv4 = "N/A";
-      try { ipv4 = player.conn.match(/.{1,2}/g)?.map((v) => String.fromCharCode(parseInt(v, 16))).join("") || "Error"; } catch (e) {}
-      const msg = "```" + `📝Info\nNick: ${player.name}\nConn: ${player.conn}\nAuth: ${player.auth}\nData: ${getDate()}` + "```";
-      sendToWebhook(joinWebhookURL, "Logs de Entrada", msg, AVATAR_URL_LOGS);
-    };
+    console.log(`🚀 Iniciando: ${roomName}...`);
 
-    room.onPlayerLeave = function (player) {
-      console.log(`Saiu: ${player.name}`);
-      delete playersConn[player.name];
-      if (officialAdms.includes(player.name)) officialAdms.splice(officialAdms.indexOf(player.name), 1);
-      if (reiniColor.includes(player.name)) reiniColor.splice(reiniColor.indexOf(player.name), 1);
-    };
+    HaxballJS().then((HBInit) => {
+        const room = HBInit({
+            roomName: roomName,
+            maxPlayers: maxPlayers,
+            public: isPublic,
+            password: roomPassword,
+            geo: geo,
+            token: configToken,
+            noPlayer: true,
+            puppeteer: { args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'], headless: true }
+        });
 
-    room.onPlayerTeamChange = function (changedPlayer, byPlayer) {
-      if (changedPlayer.team === Team.RED) room.sendAnnouncement(`🔴 ${changedPlayer.name} entrou para o time Vermelho.`, null, 0xffd700, "normal", 0);
-      else if (changedPlayer.team === Team.BLUE) room.sendAnnouncement(`🔵 ${changedPlayer.name} entrou para o time Azul.`, null, 0xffd700, "normal", 0);
-      else room.sendAnnouncement(`⚪ ${changedPlayer.name} foi para os espectadores.`, null, 0xffd700, "normal", 0);
-    };
+        // Adiciona à lista global para o Express achar
+        activeRooms.push(room);
 
-    room.onPlayerKicked = function (kickedPlayer, reason, byPlayer) {
-      if (reason === "Saiu da sala a pedido.") return;
-      room.sendAnnouncement(`👢 ${kickedPlayer.name} expulso por ${byPlayer.name}. Motivo: ${reason}`, null, 0xff0000, "bold", 0);
-    };
+        // ================= VARIAVEIS LOCAIS (Cada sala tem as suas) =================
+        const Team = { SPECTATORS: 0, RED: 1, BLUE: 2 };
+        let gameOcorring = false;
+        let officialAdms = [];
+        let playersConn = {};
+        let reiniColor = [];
+        let prefixTeamChatStringss = "t ";
+        let lastScores = null;
+        let Rposs = 0; let Bposs = 0;
+        let gameRecording = { active: false };
+        let redPlayers = []; let bluePlayers = [];
+        let bannedPlayers = new Map();
+        let currentRoomLink = null;
 
-    room.onPlayerChat = function (player, message) {
-      message = message.trim();
-      console.log(`${player.name}: ${message}`);
+        room.setTeamsLock(true);
 
-      // === COMANDOS PÚBLICOS ===
-      if (message === "!ajuda" || message === "!comandos") {
-        const help = "📜 COMANDOS 📜\n!discord » Link Discord.\n!bb » Sai da sala.\n!t mensagem » Chat de time.\n!denunciar <nick> [motivo]";
-        room.sendAnnouncement(help, player.id, 0xffffff, "normal", 0);
-        if (player.admin) setTimeout(() => room.sendAnnouncement("⭐ ADMIN: !rr, !trocarlado, !ban #ID, !unban nick, !limpar, !pb", player.id, 0xffcc00), 100);
-        return false;
-      }
-      
-      if (message === "!discord") {
-        room.sendAnnouncement("🔗 Entre no nosso Discord: https://discord.gg/tVWmwXjjWx", player.id, 0x7289da, "bold", 1);
-        return false;
-      }
-      
-      if (message === "!bb" || message === "!sair") {
-        room.kickPlayer(player.id, "Saiu da sala a pedido.", false);
-        return false;
-      }
-      
-      if (message.startsWith("!denunciar ") || message.startsWith("!troll ")) {
-        const parts = message.split(" ");
-        const target = parts[1];
-        if (!target) { room.sendAnnouncement(`Uso: !denunciar <nick> [motivo]`, player.id, 0xffcc00); return false; }
-        const reason = parts.slice(2).join(" ") || "Não especificado";
-        const tPlayer = room.getPlayerList().find(p => p.name.toLowerCase().includes(target.toLowerCase()));
-        if (!tPlayer) { room.sendAnnouncement(`Jogador "${target}" não encontrado.`, player.id, 0xffcc00); return false; }
-        
-        const msg = `🚨 DENÚNCIA de **${player.name}** contra **${tPlayer.name}**.\n**Motivo:** ${reason}\n<@&${ADMIN_ROLE_ID}>`;
-        sendToWebhook(denunciaWebhookURL, "Denúncias", msg, AVATAR_URL_LOGS);
-        room.sendAnnouncement(`✅ Denúncia enviada!`, player.id, 0x00ff00, "bold", 0);
-        return false;
-      }
-
-      // === LOGIN DONO ===
-      if (message === adminCommand) {
-        if (!officialAdms.includes(player.name)) officialAdms.push(player.name);
-        if (!reiniColor.includes(player.name)) reiniColor.push(player.name);
-        room.setPlayerAdmin(player.id, true);
-        room.sendAnnouncement(`👑 ${player.name} Autenticado como DONO!`, null, 0xffd700, "bold", 2);
-        sendToWebhook(logWebhookURL, "Logs Admin", `👑 **${player.name}** virou DONO.`, AVATAR_URL_LOGS);
-        return false;
-      } 
-      
-      // === LOGIN MODERADORES ===
-      if (modPasswords.includes(message)) {
-        room.setPlayerAdmin(player.id, true);
-        room.sendAnnouncement(`🛡️ ${player.name} Autenticado como MODERADOR!`, null, 0x00bfff, "bold", 2);
-        sendToWebhook(logWebhookURL, "Logs Admin", `🛡️ **${player.name}** virou MOD.`, AVATAR_URL_LOGS);
-        return false;
-      }
-
-      // === TEAM CHAT (t msg) ===
-      if (message.startsWith(prefixTeamChatStringss)) {
-        const tMsg = message.substring(prefixTeamChatStringss.length).trim();
-        if (player.team !== 0 && tMsg.length > 0) {
-          const color = player.team === 1 ? 0xff4c4c : 0x4c9dff;
-          const prefix = player.team === 1 ? "[🔴 TEAM]" : "[🔵 TEAM]";
-          room.getPlayerList().filter(p => p.team === player.team).forEach(p => { 
-              room.sendAnnouncement(`${prefix} ${player.name}: ${tMsg}`, p.id, color, "normal", 0); 
-          });
+        // ================= HELPER FUNCTIONS =================
+        function initPlayerStats(player) {
+            if (!stats.has(player.name)) stats.set(player.name, Array(20).fill(0));
         }
-        return false;
-      }
 
-      // === COMANDOS DE ADMIN ===
-      if (player.admin) {
-        if (message === "!trocarlado") {
-          const all = room.getPlayerList();
-          const r = all.filter(p => p.team === 1); const b = all.filter(p => p.team === 2);
-          r.forEach(p => room.setPlayerTeam(p.id, 2)); b.forEach(p => room.setPlayerTeam(p.id, 1));
-          room.sendAnnouncement(`🔄 Times Invertidos!`, null, 0x00ff00, "bold", 1);
-          return false;
+        async function sendToWebhook(url, username, content, avatarUrl) {
+            if (!url || !url.startsWith("http")) return;
+            if (!content || content.trim() === "") return;
+            // Adiciona o nome da sala no username do webhook para saber de onde veio
+            const finalUsername = `${username} | ${isSecondary ? 'Sala 2' : 'Sala 1'}`;
+            const payload = { username: finalUsername, content, avatar_url: avatarUrl };
+            try {
+                await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+            } catch (error) { console.error(`Erro Webhook:`, error.message); }
+        }
+
+        function getDate() {
+            let d = new Date();
+            return `${d.getDate()}-${d.getMonth() + 1}-${d.getFullYear()} ${d.getHours()}h${d.getMinutes()}m`;
         }
         
-        if (message === "!rr") { 
-            room.stopGame(); 
-            setTimeout(() => room.startGame(), 100); 
-            return false; 
+        function customTime(time) {
+            const totalSeconds = Math.trunc(time);
+            return `${Math.floor(totalSeconds / 60)}m${String(totalSeconds % 60).padStart(2, "0")}s`;
         }
-        
-        if (message.startsWith("!ban ")) {
-          const tid = parseInt(message.split(" ")[1].replace("#", ""));
-          const tp = room.getPlayer(tid);
-          if (tp) {
-            const r = message.split(" ").slice(2).join(" ") || "Banido por admin";
-            bannedPlayers.set(tp.conn, { name: tp.name, banTime: Date.now() });
-            room.kickPlayer(tp.id, r, true);
-            const bm = `⛔ ${tp.name} banido por ${player.name}. Motivo: ${r}`;
-            room.sendAnnouncement(bm, null, 0xff0000, "bold");
-            sendToWebhook(banLogWebhookURL, "Punições", `\`\`\`${bm}\`\`\``, AVATAR_URL_LOGS);
-          } else room.sendAnnouncement("Jogador não encontrado.", player.id, 0xffcc00);
-          return false;
-        }
-        
-        if (message.startsWith("!unban ")) {
-          const tname = message.split(" ").slice(1).join(" ");
-          let fConn = null;
-          for (const [c, b] of bannedPlayers.entries()) { 
-              if (b.name.toLowerCase() === tname.toLowerCase()) { fConn = c; break; } 
-          }
-          if (fConn) {
-            bannedPlayers.delete(fConn); room.clearBan(fConn);
-            const ubm = `✅ ${tname} desbanido por ${player.name}.`;
-            room.sendAnnouncement(ubm, null, 0x00ff00, "bold");
-            sendToWebhook(banLogWebhookURL, "Punições", `\`\`\`${ubm}\`\`\``, AVATAR_URL_LOGS);
-          } else room.sendAnnouncement(`"${tname}" não achado nos bans recentes.`, player.id, 0xffcc00);
-          return false;
-        }
-        
-        if (message === "!limpar") {
-          room.clearBans(); bannedPlayers.clear();
-          const cm = `🧹 Bans limpos por ${player.name}.`;
-          room.sendAnnouncement(cm, null, 0x00ff00, "bold");
-          return false;
-        }
-        
-        if (message === "!puxarbola" || message === "!pb") {
-          if (player.position) { 
-              room.setDiscProperties(0, { x: player.position.x, y: player.position.y, xspeed: 0, yspeed: 0 }); 
-              room.sendAnnouncement("⚽ Bola puxada!", player.id, 0x00ff00, "bold", 0); 
-          }
-          return false;
-        }
-      }
 
-      // Chat Normal e Colorido
-      if (!message.startsWith("!")) {
-        let dm = `[${player.team === 1 ? "🔴" : (player.team === 2 ? "🔵" : "⚪")}] **${player.name}**: ${message}`;
-        sendToWebhook(chatWebhookURL, "Chat In-Game", dm, AVATAR_URL_CHAT);
-      }
-      
-      if (reiniColor.includes(player.name)) { 
-          room.sendAnnouncement(`👑 ${player.name}: ${message}`, undefined, 0xff0000, "bold"); 
-          return false; 
-      }
-      return true;
-    };
-
-    room.onGameStart = function (by) {
-      gameOcorring = true; Rposs = 0; Bposs = 0; lastPlayersTouched = [null, null]; lastScores = null;
-      redPlayers = room.getPlayerList().filter(p => p.team === 1).map(p => p.name); 
-      bluePlayers = room.getPlayerList().filter(p => p.team === 2).map(p => p.name);
-      startRecording();
-    };
-
-    room.onGameStop = function (by) {
-      gameOcorring = false; 
-      lastScores = room.getScores(); 
-      sendReplayToDiscord();
-      
-      if (lastScores && lastScores.time > 0) {
-        if (lastScores.red === lastScores.blue) room.sendAnnouncement(`🤝 EMPATE! ${lastScores.red} - ${lastScores.blue}`, null, 0xffd700, "bold", 2);
-        else { 
-            const w = lastScores.red > lastScores.blue ? "🔴 VERMELHO" : "🔵 AZUL"; 
-            room.sendAnnouncement(`🏆 FIM! Vitória do ${w} (${lastScores.red} - ${lastScores.blue})`, null, 0xffd700, "bold", 2); 
+        function startRecording() {
+            if (gameRecording.active) return;
+            try { room.startRecording(); gameRecording.active = true; } catch (e) { console.error("Erro rec:", e); }
         }
-      }
-      saveStats();
-    };
+
+        async function sendReplayToDiscord() {
+            if (!gameRecording.active) return;
+            const replayData = room.stopRecording();
+            gameRecording.active = false;
+            if (!replayData || replayData.byteLength < 50) return;
+            if (!replayWebhookURL || !replayWebhookURL.startsWith("http")) return;
+
+            const sc = lastScores || room.getScores() || { red: 0, blue: 0, time: 0 };
+            const fileName = `Replay-${getDate().replace(/\s/g, '_')}.hbr2`;
+            const rP = (Rposs + Bposs > 0) ? ((Rposs / (Rposs+Bposs)) * 100).toFixed(1) : "0.0";
+            const bP = (Rposs + Bposs > 0) ? ((Bposs / (Rposs+Bposs)) * 100).toFixed(1) : "0.0";
+
+            const payload_json = JSON.stringify({
+                username: `📹 REPLAY (${roomName})`, avatar_url: AVATAR_URL_REPLAY, content: "A gravação da partida foi finalizada!",
+                embeds: [{
+                    color: 0x2b2d31, title: roomName, description: "Estatísticas:", footer: { text: `Partida de ${getDate()}` },
+                    fields: [
+                        { name: `🔴 Time Vermelho`, value: `**Placar:** ${sc.red}\n**Jogadores:**\n${redPlayers.join("\n") || "-"}`, inline: true },
+                        { name: `🔵 Time Azul`, value: `**Placar:** ${sc.blue}\n**Jogadores:**\n${bluePlayers.join("\n") || "-"}`, inline: true },
+                        { name: "⏱️ Tempo", value: `\`${customTime(sc.time)}\``, inline: true },
+                        { name: "📊 Posse", value: `\`\`\`diff\n+ Red: ${rP}%\n- Blue: ${bP}%\`\`\``, inline: false },
+                    ]
+                }]
+            });
+
+            const form = new FormData();
+            form.append("payload_json", payload_json);
+            form.append("file", Buffer.from(replayData), { filename: fileName, contentType: "application/octet-stream" });
+
+            try { await fetch(replayWebhookURL, { method: "POST", body: form }); } catch (error) { console.error("Erro replay:", error); }
+        }
+
+        // ================= EVENTOS DA SALA =================
+        room.onRoomLink = function (link) {
+            console.log(`✅ ${roomName} ONLINE | Link: ${link}`);
+            currentRoomLink = link;
+            
+            // Só salva o monitor de status se for a sala principal (para evitar conflito de arquivo)
+            if (!isSecondary) {
+                setInterval(() => {
+                    try {
+                        const players = room.getPlayerList().filter((p) => p.id !== 0);
+                        fs.writeFileSync(STATUS_MONITOR_FILE_PATH, JSON.stringify({ playerCount: players.length, maxPlayers, roomLink: currentRoomLink, lastUpdate: new Date().toISOString() }, null, 2));
+                    } catch (e) {}
+                }, 15000);
+            }
+        };
+
+        room.onPlayerJoin = function (player) {
+            console.log(`[${roomName}] Entrou: ${player.name}`);
+            initPlayerStats(player);
+            playersConn[player.name] = player.conn;
+            
+            if (room.getPlayerList().filter((p) => p.id !== 0).length === 1) room.setPlayerAdmin(player.id, true);
+            
+            room.sendAnnouncement(`👋🏼 Bem-vindo(a) à arena ${roomName}, ${player.name}!`, player.id, 0x00ff00, "bold", 1);
+            
+            let ipv4 = "N/A";
+            try { ipv4 = player.conn.match(/.{1,2}/g)?.map((v) => String.fromCharCode(parseInt(v, 16))).join("") || "Error"; } catch (e) {}
+            const msg = "```" + `📝Info (${roomName})\nNick: ${player.name}\nConn: ${player.conn}\nAuth: ${player.auth}\nData: ${getDate()}` + "```";
+            sendToWebhook(joinWebhookURL, "Logs de Entrada", msg, AVATAR_URL_LOGS);
+        };
+
+        room.onPlayerLeave = function (player) {
+            delete playersConn[player.name];
+            if (officialAdms.includes(player.name)) officialAdms.splice(officialAdms.indexOf(player.name), 1);
+            if (reiniColor.includes(player.name)) reiniColor.splice(reiniColor.indexOf(player.name), 1);
+        };
+
+        room.onPlayerTeamChange = function (changedPlayer, byPlayer) {
+            if (changedPlayer.team === Team.RED) room.sendAnnouncement(`🔴 ${changedPlayer.name} entrou para o time Vermelho.`, null, 0xffd700, "normal", 0);
+            else if (changedPlayer.team === Team.BLUE) room.sendAnnouncement(`🔵 ${changedPlayer.name} entrou para o time Azul.`, null, 0xffd700, "normal", 0);
+            else room.sendAnnouncement(`⚪ ${changedPlayer.name} foi para os espectadores.`, null, 0xffd700, "normal", 0);
+        };
+
+        room.onPlayerKicked = function (kickedPlayer, reason, byPlayer) {
+            if (reason === "Saiu da sala a pedido.") return;
+            room.sendAnnouncement(`👢 ${kickedPlayer.name} expulso por ${byPlayer.name}. Motivo: ${reason}`, null, 0xff0000, "bold", 0);
+        };
+
+        room.onPlayerChat = function (player, message) {
+            message = message.trim();
+            console.log(`[${roomName}] ${player.name}: ${message}`);
+
+            // === COMANDOS ===
+            if (message === "!ajuda" || message === "!comandos") {
+                const help = "📜 COMANDOS 📜\n!discord » Link Discord.\n!bb » Sai da sala.\n!t mensagem » Chat de time.\n!denunciar <nick> [motivo]";
+                room.sendAnnouncement(help, player.id, 0xffffff, "normal", 0);
+                if (player.admin) setTimeout(() => room.sendAnnouncement("⭐ ADMIN: !rr, !trocarlado, !ban #ID, !unban nick, !limpar, !pb", player.id, 0xffcc00), 100);
+                return false;
+            }
+            
+            if (message === "!discord") {
+                room.sendAnnouncement("🔗 Entre no nosso Discord: https://discord.gg/tVWmwXjjWx", player.id, 0x7289da, "bold", 1);
+                return false;
+            }
+            
+            if (message === "!bb" || message === "!sair") {
+                room.kickPlayer(player.id, "Saiu da sala a pedido.", false);
+                return false;
+            }
+            
+            if (message.startsWith("!denunciar ") || message.startsWith("!troll ")) {
+                const parts = message.split(" ");
+                const target = parts[1];
+                if (!target) { room.sendAnnouncement(`Uso: !denunciar <nick> [motivo]`, player.id, 0xffcc00); return false; }
+                const reason = parts.slice(2).join(" ") || "Não especificado";
+                const tPlayer = room.getPlayerList().find(p => p.name.toLowerCase().includes(target.toLowerCase()));
+                if (!tPlayer) { room.sendAnnouncement(`Jogador "${target}" não encontrado.`, player.id, 0xffcc00); return false; }
+                
+                const msg = `🚨 DENÚNCIA (${roomName}) de **${player.name}** contra **${tPlayer.name}**.\n**Motivo:** ${reason}\n<@&${ADMIN_ROLE_ID}>`;
+                sendToWebhook(denunciaWebhookURL, "Denúncias", msg, AVATAR_URL_LOGS);
+                room.sendAnnouncement(`✅ Denúncia enviada!`, player.id, 0x00ff00, "bold", 0);
+                return false;
+            }
+
+            if (message === adminCommand) {
+                if (!officialAdms.includes(player.name)) officialAdms.push(player.name);
+                if (!reiniColor.includes(player.name)) reiniColor.push(player.name);
+                room.setPlayerAdmin(player.id, true);
+                room.sendAnnouncement(`👑 ${player.name} Autenticado como DONO!`, null, 0xffd700, "bold", 2);
+                sendToWebhook(logWebhookURL, "Logs Admin", `👑 **${player.name}** virou DONO na ${roomName}.`, AVATAR_URL_LOGS);
+                return false;
+            } 
+            
+            if (modPasswords.includes(message)) {
+                room.setPlayerAdmin(player.id, true);
+                room.sendAnnouncement(`🛡️ ${player.name} Autenticado como MODERADOR!`, null, 0x00bfff, "bold", 2);
+                sendToWebhook(logWebhookURL, "Logs Admin", `🛡️ **${player.name}** virou MOD na ${roomName}.`, AVATAR_URL_LOGS);
+                return false;
+            }
+
+            if (message.startsWith(prefixTeamChatStringss)) {
+                const tMsg = message.substring(prefixTeamChatStringss.length).trim();
+                if (player.team !== 0 && tMsg.length > 0) {
+                    const color = player.team === 1 ? 0xff4c4c : 0x4c9dff;
+                    const prefix = player.team === 1 ? "[🔴 TEAM]" : "[🔵 TEAM]";
+                    room.getPlayerList().filter(p => p.team === player.team).forEach(p => { 
+                        room.sendAnnouncement(`${prefix} ${player.name}: ${tMsg}`, p.id, color, "normal", 0); 
+                    });
+                }
+                return false;
+            }
+
+            if (player.admin) {
+                if (message === "!trocarlado") {
+                    const all = room.getPlayerList();
+                    const r = all.filter(p => p.team === 1); const b = all.filter(p => p.team === 2);
+                    r.forEach(p => room.setPlayerTeam(p.id, 2)); b.forEach(p => room.setPlayerTeam(p.id, 1));
+                    room.sendAnnouncement(`🔄 Times Invertidos!`, null, 0x00ff00, "bold", 1);
+                    return false;
+                }
+                
+                if (message === "!rr") { 
+                    room.stopGame(); 
+                    setTimeout(() => room.startGame(), 100); 
+                    return false; 
+                }
+                
+                if (message.startsWith("!ban ")) {
+                    const tid = parseInt(message.split(" ")[1].replace("#", ""));
+                    const tp = room.getPlayer(tid);
+                    if (tp) {
+                        const r = message.split(" ").slice(2).join(" ") || "Banido por admin";
+                        bannedPlayers.set(tp.conn, { name: tp.name, banTime: Date.now() });
+                        room.kickPlayer(tp.id, r, true);
+                        const bm = `⛔ ${tp.name} banido por ${player.name}. Motivo: ${r}`;
+                        room.sendAnnouncement(bm, null, 0xff0000, "bold");
+                        sendToWebhook(banLogWebhookURL, "Punições", `\`\`\`${bm} (${roomName})\`\`\``, AVATAR_URL_LOGS);
+                    } else room.sendAnnouncement("Jogador não encontrado.", player.id, 0xffcc00);
+                    return false;
+                }
+                
+                if (message.startsWith("!unban ")) {
+                    const tname = message.split(" ").slice(1).join(" ");
+                    let fConn = null;
+                    for (const [c, b] of bannedPlayers.entries()) { 
+                        if (b.name.toLowerCase() === tname.toLowerCase()) { fConn = c; break; } 
+                    }
+                    if (fConn) {
+                        bannedPlayers.delete(fConn); room.clearBan(fConn);
+                        const ubm = `✅ ${tname} desbanido por ${player.name}.`;
+                        room.sendAnnouncement(ubm, null, 0x00ff00, "bold");
+                        sendToWebhook(banLogWebhookURL, "Punições", `\`\`\`${ubm} (${roomName})\`\`\``, AVATAR_URL_LOGS);
+                    } else room.sendAnnouncement(`"${tname}" não achado nos bans recentes.`, player.id, 0xffcc00);
+                    return false;
+                }
+                
+                if (message === "!limpar") {
+                    room.clearBans(); bannedPlayers.clear();
+                    const cm = `🧹 Bans limpos por ${player.name}.`;
+                    room.sendAnnouncement(cm, null, 0x00ff00, "bold");
+                    return false;
+                }
+                
+                if (message === "!puxarbola" || message === "!pb") {
+                    if (player.position) { 
+                        room.setDiscProperties(0, { x: player.position.x, y: player.position.y, xspeed: 0, yspeed: 0 }); 
+                        room.sendAnnouncement("⚽ Bola puxada!", player.id, 0x00ff00, "bold", 0); 
+                    }
+                    return false;
+                }
+            }
+
+            if (!message.startsWith("!")) {
+                let dm = `[${roomName}] [${player.team === 1 ? "🔴" : (player.team === 2 ? "🔵" : "⚪")}] **${player.name}**: ${message}`;
+                sendToWebhook(chatWebhookURL, "Chat In-Game", dm, AVATAR_URL_CHAT);
+            }
+            
+            if (reiniColor.includes(player.name)) { 
+                room.sendAnnouncement(`👑 ${player.name}: ${message}`, undefined, 0xff0000, "bold"); 
+                return false; 
+            }
+            return true;
+        };
+
+        room.onGameStart = function (by) {
+            gameOcorring = true; Rposs = 0; Bposs = 0; lastPlayersTouched = [null, null]; lastScores = null;
+            redPlayers = room.getPlayerList().filter(p => p.team === 1).map(p => p.name); 
+            bluePlayers = room.getPlayerList().filter(p => p.team === 2).map(p => p.name);
+            startRecording();
+        };
+
+        room.onGameStop = function (by) {
+            gameOcorring = false; 
+            lastScores = room.getScores(); 
+            sendReplayToDiscord();
+            
+            if (lastScores && lastScores.time > 0) {
+                if (lastScores.red === lastScores.blue) room.sendAnnouncement(`🤝 EMPATE! ${lastScores.red} - ${lastScores.blue}`, null, 0xffd700, "bold", 2);
+                else { 
+                    const w = lastScores.red > lastScores.blue ? "🔴 VERMELHO" : "🔵 AZUL"; 
+                    room.sendAnnouncement(`🏆 FIM! Vitória do ${w} (${lastScores.red} - ${lastScores.blue})`, null, 0xffd700, "bold", 2); 
+                }
+            }
+            saveStats();
+        };
+    });
+}
+
+// ===============================================================
+// 🚀 INICIALIZAÇÃO DAS SALAS
+// ===============================================================
+
+// Sala 1 (Usa as variáveis normais)
+iniciarBot(process.env.HAXBALL_TOKEN, process.env.ROOM_NAME, process.env.MAX_PLAYERS, process.env.PUBLIC, false);
+
+// Sala 2 (Usa as variáveis novas com "_2". Se não existirem, não inicia.)
+iniciarBot(process.env.HAXBALL_TOKEN_2, process.env.ROOM_NAME_2, process.env.MAX_PLAYERS_2, process.env.PUBLIC, true);
+
+
+// ===============================================================
+// 🌐 SERVIDOR EXPRESS (Controla Webhooks para AMBAS as salas)
+// ===============================================================
+const app = express();
+app.use(express.json());
+
+app.get('/', (req, res) => res.send('Bots Haxball Rodando!'));
+
+// Webhook para mandar msg do Discord para as salas
+app.post("/discord-chat", (req, res) => {
+    const { author, message } = req.body;
+    if (!author || !message) return res.status(400).send({ error: "Faltando dados" });
+    
+    // Manda para TODAS as salas ativas
+    activeRooms.forEach(room => {
+        try {
+            room.sendAnnouncement(`[💬 Discord] ${author}: ${message}`, null, 0xffff00, "bold", 0);
+        } catch (e) { console.error("Erro enviando msg Discord para sala:", e); }
+    });
+    res.status(200).send({ status: "ok" });
 });
 
+// Comandos de Admin via Webhook
+app.post("/admin-command", (req, res) => {
+    const { authorization } = req.headers;
+    const { command, author } = req.body;
+    if (authorization !== `Bearer ${ADMIN_SECRET_KEY}`) return res.status(403).send({ error: "Acesso negado" });
+    
+    if (command === "clearbans") {
+        activeRooms.forEach(room => {
+            room.clearBans();
+            room.sendAnnouncement(`🧹 Todos os bans removidos remotamente por ${author}.`, null, 0x00ff00, "bold");
+        });
+        res.status(200).send({ message: "Sucesso em todas as salas" });
+    } else res.status(400).send({ error: "Comando desconhecido" });
+});
+
+app.listen(WEBHOOK_PORT, () => console.log(`[SERVER] Webserver rodando na porta ${WEBHOOK_PORT}`));
