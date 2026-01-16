@@ -1,60 +1,52 @@
-const HBInit = require('haxball.js');
+let HBInit;
+try {
+    const lib = require('haxball.js');
+    if (typeof lib === 'function') HBInit = lib;
+    else if (lib.HBInit) HBInit = lib.HBInit;
+    else if (lib.default) HBInit = lib.default;
+    else process.exit(1);
+} catch (e) { console.error(e); process.exit(1); }
 
-const config = {
-    name: process.env.ROOM_NAME_2 || "Haxball Sala 2",
-    token: process.env.HAXBALL_TOKEN_2,
-    // Vi nos logs que a senha da sala 2 está na variável PASSWORD_2
-    password: process.env.PASSWORD_2 || "", 
-    maxPlayers: parseInt(process.env.MAX_PLAYERS_2) || 12,
-    // Vi nos logs MOD_PASS_2
-    modCommand: process.env.MOD_PASS_2 || "!mod",
-    geo: { code: "br", lat: -23.5505, lon: -46.6333 }
-};
+const nomeSala = process.env.ROOM_NAME_2 || "Sala 2";
+const tokenSala = process.env.HAXBALL_TOKEN_2;
 
-// --- FIX KEEP ALIVE ---
-setInterval(() => {}, 1000 * 60 * 30);
+if (!tokenSala) { console.error("Token 2 vazio"); process.exit(1); }
 
-if (!config.token) {
-    console.log("[SALA 2] ⚠️ Token 2 não configurado.");
-} else {
+console.log("Tentando conectar...");
 
-    console.log(`[SALA 2] 🔄 Iniciando...`);
-    console.log(`[SALA 2] 📝 Nome: ${config.name}`);
-
-    HBInit({
-        roomName: config.name,
-        maxPlayers: config.maxPlayers,
-        public: !config.password,
-        password: config.password,
-        token: config.token,
-        geo: config.geo,
+try {
+    const sala = HBInit({
+        roomName: nomeSala,
+        maxPlayers: parseInt(process.env.MAX_PLAYERS_2) || 12,
+        public: true,
         noPlayer: true,
-        puppeteer: { args: ['--no-sandbox', '--disable-setuid-sandbox'], headless: true }
-    }).then((room) => {
-
-        room.onRoomLink = (link) => {
-            console.log("==================================================");
-            console.log(`[SALA 2] 🔗 LINK: ${link}`);
-            console.log("==================================================");
-        };
-
-        room.onPlayerJoin = (player) => {
-            console.log(`[SALA 2] 👤 Entrou: ${player.name}`);
-            room.sendChat(`Bem-vindo à Sala 2!`, player.id);
-        };
-
-        room.onPlayerChat = (player, message) => {
-            if (message === config.modCommand) {
-                room.setPlayerAdmin(player.id, true);
-                console.log(`[SALA 2] 👮 Admin dado para ${player.name}`);
-                return false;
-            }
-        };
-        
-        room.onRoomExit = () => { process.exit(1); };
-
-    }).catch((err) => {
-        console.error("[SALA 2] ❌ ERRO:", err);
-        process.exit(1);
+        token: tokenSala,
+        password: process.env.ROOM_PASS_2 || null,
+        // === CORREÇÃO DE MEMÓRIA E GPU ===
+        puppeteer: {
+            headless: true,
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage', // <--- ESSA É A SALVAÇÃO
+                '--disable-gpu',
+                '--no-first-run',
+                '--no-zygote'
+            ]
+        }
+        // =================================
     });
+
+    sala.onRoomLink = function(link) {
+        console.log(`SUCESSO! Link: ${link}`);
+    };
+
+    sala.onPlayerChat = function(player, message) {
+        if (message === process.env.ADMIN_PASS) {
+            sala.setPlayerAdmin(player.id, true);
+            return false;
+        }
+    };
+} catch (error) {
+    console.error("ERRO FATAL:", error);
 }
