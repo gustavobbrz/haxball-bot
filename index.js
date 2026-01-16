@@ -1,5 +1,5 @@
 // ===============================================================
-// === SEU SCRIPT ORIGINAL OTIMIZADO (COM TEAM CHAT E REPLAY) ===
+// === SCRIPT CORRIGIDO - VERSÃO FINAL ===
 // ===============================================================
 
 const HaxballJS = require("haxball.js");
@@ -13,7 +13,7 @@ const path = require("path");
 // ---------------------------------------------------------------
 // CONFIGURAÇÃO GERAL
 // ---------------------------------------------------------------
-const roomName = process.env.ROOM_NAME || "⚫️🟣 FUTSAL DO REDLEY 24HRS 🟣⚫️";
+const roomName = process.env.ROOM_NAME || "🏆 SALA DE FUTSAL 🏆";
 const maxPlayers = parseInt(process.env.MAX_PLAYERS) || 30;
 const roomPublic = process.env.PUBLIC === "false" ? false : true; 
 const token = process.env.HAXBALL_TOKEN; 
@@ -31,8 +31,8 @@ const modPasswords = [
 // Geo Location
 const geo = { 
     code: process.env.GEO_CODE || "BR", 
-    lat: parseFloat(process.env.GEO_LAT) || -23.51634162, 
-    lon: parseFloat(process.env.GEO_LON) || -46.6460824 
+    lat: parseFloat(process.env.GEO_LAT) || -23.51, 
+    lon: parseFloat(process.env.GEO_LON) || -46.64 
 };
 
 // Configurações Internas
@@ -41,21 +41,19 @@ const STATS_FILE_PATH = path.join(__dirname, "dd_stats.json");
 const STATUS_MONITOR_FILE_PATH = path.join(__dirname, "status_dd.json");
 const ADMIN_SECRET_KEY = process.env.ADMIN_KEY || "8962926258";
 
-// =================== WEBHOOKS & ID (Preencha se necessário) ===================
+// =================== WEBHOOKS & ID ===================
 const AVATAR_URL_CHAT = "https://media.discordapp.net/attachments/1374313154099810355/1400601050377097267/1000055589-removebg-preview.png";
 const AVATAR_URL_LOGS = AVATAR_URL_CHAT;
 const AVATAR_URL_REPLAY = AVATAR_URL_CHAT;
 
-// Se as variaveis de ambiente não existirem, usa strings vazias para não crashar
-const denunciaWebhookURL = process.env.WH_DENUNCIA || "https://discord.com/api/webhooks/1436113130857173143/VyjHhraGyiFHO0xsGLfksALtD0wdFiyqrfyxFD0pXbAvRmYBXONOXxSAqfyJ0lKeBWHe";
-const logWebhookURL = process.env.WH_LOGS || "https://discord.com/api/webhooks/1436111431153090623/1DANzAWymIIbeXfKxvWJQCh8Z6ZmfJKcU46y7IuYdw002M8IozdU5vzKtb7tM6BYBMbQ";
-const joinWebhookURL = process.env.WH_JOIN || "https://discord.com/api/webhooks/1436111483770765447/2IBt_fUcUyl0ilCN4bUO-c8HXxGpp7GbMFrUAtlgJQDteIDyb4lYjNVhyGJtKlo0lsTr";
-const replayWebhookURL = process.env.WH_REPLAY || "https://discord.com/api/webhooks/1436111294217326676/WPz8323y_YSUaA7qZjocFZRZ-qgbiuw_pFiX9hJ_pH9gbSrlKouv11fTciy0rNHLYkyh";
-const chatWebhookURL = process.env.WH_CHAT || "https://discord.com/api/webhooks/1436111218187309189/YDaAWS03YfhJIqFjoKPTylAVYwUUxO2cw8YM_L1SISoy63Oi8YTFuc0Agx-0qO0Wuq9J";
-const banLogWebhookURL = process.env.WH_BAN || "https://discord.com/api/webhooks/1436111567753187389/BxgJFuFu84ICVqiEK2Q7QT_UuN9XkpaMUwl3Fi72yojSS0u0ONUdgwGugxZy_nsFvoJs";
+const denunciaWebhookURL = process.env.WH_DENUNCIA || "";
+const logWebhookURL = process.env.WH_LOGS || "";
+const joinWebhookURL = process.env.WH_JOIN || "";
+const replayWebhookURL = process.env.WH_REPLAY || "";
+const chatWebhookURL = process.env.WH_CHAT || "";
+const banLogWebhookURL = process.env.WH_BAN || "";
 
 const ADMIN_ROLE_ID = "1354583450941784154";
-const DONO_ROLE_ID = "1354613511208308776";
 
 // ================= FUNÇÕES DE ESTATÍSTICAS =================
 const SsEnumForSave = { WI: 1, LS: 2, DR: 3, GL: 5, AS: 6, CS: 8 };
@@ -76,7 +74,7 @@ function saveStats() {
       };
     }
     fs.writeFileSync(STATS_FILE_PATH, JSON.stringify(statsObject, null, 2), "utf8");
-  } catch (error) { console.error("[STATS] Erro salvar:", error); }
+  } catch (error) { console.error("[STATS] Erro salvar:", error.message); }
 }
 
 function loadStats() {
@@ -87,7 +85,7 @@ function loadStats() {
       const tempMap = new Map();
       for (let playerName in statsObject) {
         const pStats = statsObject[playerName];
-        const statsArray = Array(20).fill(0); // Garante array seguro
+        const statsArray = Array(20).fill(0); 
         statsArray[SsEnumForSave.WI] = pStats.wins || 0;
         statsArray[SsEnumForSave.LS] = pStats.losses || 0;
         statsArray[SsEnumForSave.DR] = pStats.draws || 0;
@@ -103,7 +101,7 @@ function loadStats() {
         stats = new Map(); 
         saveStats();
     }
-  } catch (error) { console.error("[STATS] Erro carregar:", error); stats = new Map(); }
+  } catch (error) { console.error("[STATS] Erro carregar:", error.message); stats = new Map(); }
 }
 
 // ---------------------------------------------------------------
@@ -116,7 +114,8 @@ if (!token) {
 
 loadStats();
 
-HaxballJS.then((HBInit) => {
+// CORREÇÃO AQUI: Adicionado () após HaxballJS
+HaxballJS().then((HBInit) => {
     const room = HBInit({
       roomName, maxPlayers, public: roomPublic, password: roomPassword, geo, token, noPlayer: true,
       puppeteer: { args: ['--no-sandbox', '--disable-setuid-sandbox'], headless: true }
@@ -294,11 +293,11 @@ HaxballJS.then((HBInit) => {
       }
       
       if (message === "!discord") {
-        room.sendAnnouncement("🔗 Entre no nosso Discord: https://discord.gg/tVWmwXjjWx", player.id, 0x7289da, "bold", 1);
+        room.sendAnnouncement("🔗 Entre no nosso Discord: (Configure o Link)", player.id, 0x7289da, "bold", 1);
         return false;
       }
       
-      if (message === "!bb" || message === "!BB" ||message === "!sair"  ) {
+      if (message === "!bb" || message === "!sair") {
         room.kickPlayer(player.id, "Saiu da sala a pedido.", false);
         return false;
       }
