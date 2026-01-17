@@ -1,82 +1,47 @@
-const HaxballJS = require("haxball.js");
-const express = require("express");
-const fs = require("fs");
-const path = require("path");
-
-let config;
-try { config = require("./config.json"); } catch (e) { console.error("Missing config.json - copy config.json.example to config.json and fill tokens."); process.exit(1); }
-
-const carregarLogicaFutsal = require("./src/futsal.js");
-
-const app = express();
-app.use(express.json());
-
-const roomsMap = new Map();
+const configManager = require("./config-manager.js");
+const RoomManager = require("./room-manager.js");
+const APIServer = require("./api-server.js");
 
 async function main() {
-  const HBInit = await HaxballJS();
+  console.log("🚀 Iniciando servidor Haxball...");
 
-  for (const rcfg of (config.rooms || [])) {
-    if (!rcfg.token || rcfg.token === "vazio") {
-      console.log(`[ROOM ${rcfg.id}] Pulada: Sem token.`);
-      continue;
+  // Carrega configuração
+  let config = configManager.loadConfig();
+  console.log(`✅ Configuração carregada. Versão: ${config.version || "1.0"}`);
+
+  // Inicializa gerenciador de salas
+  const roomManager = new RoomManager(config);
+  await roomManager.initialize();
+  console.log("✅ Gerenciador de salas inicializado");
+
+  // Inicia salas configuradas
+  console.log(`📋 Iniciando ${config.rooms.length} sala(s)...`);
+  for (const roomConfig of config.rooms) {
+    if (roomConfig.token && roomConfig.token !== "vazio") {
+      await roomManager.createRoom(roomConfig.id, roomConfig);
     }
-
-    const room = HBInit({
-      roomName: rcfg.roomName || `Futsal #${rcfg.id}`,
-      maxPlayers: rcfg.maxPlayers || 30,
-      public: rcfg.public !== false,
-      geo: rcfg.geo || undefined,
-      token: rcfg.token,
-      noPlayer: true,
-      puppeteer: { args: ['--no-sandbox', '--disable-setuid-sandbox'], headless: true }
-    });
-
-    roomsMap.set(rcfg.id, room);
-    carregarLogicaFutsal(room, rcfg.id, config);
-
-    room.onRoomLink = (link) => console.log(`[ROOM ${rcfg.id}] ONLINE: ${link}`);
   }
 
-  app.get("/status", (req, res) => {
-    try {
-      const out = [];
-      roomsMap.forEach((room, id) => {
-        const players = (room.getPlayerList() || []).filter(p => p && p.id !== 0);
-        out.push({ id, players: players.length });
-      });
-      res.status(200).json({ online: true, rooms: out });
-    } catch (err) { res.status(500).json({ online: false }); }
-  });
-
-  app.post("/discord-chat", (req, res) => {
-    try {
-      const { roomId, author, message } = req.body;
-      const room = roomsMap.get(roomId);
-      if (!room) return res.status(404).send({ error: "Sala não encontrada" });
-      room.sendAnnouncement(`[💬 Discord] ${author}: ${message}`, null, 0xffff00, "bold", 0);
-      res.status(200).send({ status: "ok" });
-    } catch (error) { res.status(500).send({ error: "Erro interno" }); }
-  });
-
-  app.post("/admin-command", (req, res) => {
-    try {
-      const auth = req.headers.authorization;
-      if (auth !== `Bearer ${config.adminSecret}`) return res.status(403).send({ error: "Acesso negado" });
-      const { roomId, command } = req.body;
-      const room = roomsMap.get(roomId);
-      if (!room) return res.status(404).send({ error: "Sala não encontrada" });
-
-      if (command === "clearbans") {
-        try { room.clearBans(); } catch (e) {}
-        return res.status(200).send({ message: "Sucesso" });
-      }
-      res.status(400).send({ error: "Comando desconhecido" });
-    } catch (e) { res.status(500).send({ error: "Erro" }); }
-  });
-
+  // Inicia API REST
+  const apiServer = new APIServer(roomManager, configManager, config);
   const port = config.port || 3002;
-  app.listen(port, () => console.log(`API rodando na porta ${port}`));
+  apiServer.start(port);
+
+  console.log("\n========================================");
+  console.log("🎮 Servidor Haxball pronto para uso!");
+  console.log("========================================");
+  console.log(`Endpoints disponíveis:`);
+  console.log(`  GET  /health             - Verificar status`);
+  console.log(`  GET  /status             - Status de todas as salas`);
+  console.log(`  GET  /rooms              - Listar salas`);
+  console.log(`  POST /rooms              - Criar/atualizar sala`);
+  console.log(`  DELETE /rooms/:id        - Deletar sala`);
+  console.log(`  POST /discord-chat       - Enviar mensagem para sala`);
+  console.log(`  POST /admin-command      - Executar comando`);
+  console.log("========================================\n");
 }
 
-main().catch(err => { console.error(err); process.exit(1); });
+main().catch(err => {
+  console.error("❌ Erro fatal:", err);
+  process.exit(1);
+});
