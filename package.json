@@ -1,24 +1,28 @@
 {
-  "name": "simplehaxballfutsal",
+  "name": "arena-cup-discord-bot",
   "version": "1.0.0",
-  "description": "Simple 1x1/2x2/3x3 futsal script for Haxball Headless Host (and for deploying with haxball.js).",
-  "main": "dist/index.js",
+  "description": "Bot de administração do Discord para Arena Cup",
+  "main": "bot.js",
   "scripts": {
-    "build": "npx tsc",
-    "start": "node dist/index.js"
+    "start": "node bot.js",
+    "dev": "nodemon bot.js"
   },
   "keywords": [
+    "discord",
+    "bot",
     "haxball",
-    "futsal",
-    "haxball.js"
+    "arena-cup"
   ],
-  "author": "DazzDev",
+  "author": "Arena Cup Team",
   "license": "MIT",
   "dependencies": {
-    "haxball.js": "^2.1.2"
+    "discord.js": "^14.14.1",
+    "dotenv": "^16.3.1"
   },
   "devDependencies": {
-    "@types/node": "^18.13.0",
-    "typescript": "^4.9.5"
+    "nodemon": "^3.0.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }

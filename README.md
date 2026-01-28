@@ -1,256 +1,444 @@
-# 🔥 HAX HOST - Servidor Haxball Profissional 🔥
+# 🤖 Arena Cup Discord Bot
 
-Servidor de Haxball com 4 salas personalizadas no estilo Amebas, com sistema completo de administração, webhooks do Discord e moderação automática.
-
----
-
-## 🎮 Salas Disponíveis
-
-1. **🔥HAX HOST🔥 FUTSAL X3 NIVEL 🔥** - Sala para jogadores experientes (3x3)
-2. **🔥HAX HOST🔥 FUTSAL X3 NOOBS🔥** - Sala para iniciantes (3x3)
-3. **🔥HAX HOST🔥 FUTSAL X1 🔥** - Sala para duelos 1x1
-4. **🔥HAX HOST 🔥FUTSAL X4  🔥** - Sala para partidas grandes (4x4)
+Bot completo de administração para o servidor Discord do Arena Cup, com sistema de tickets, registro automático de players, comandos de administração e monitoramento de salas.
 
 ---
 
 ## ✨ Funcionalidades
 
-### 🎯 Sistema de Jogo
-- Inicia e para partidas automaticamente
-- Move jogadores automaticamente dependendo do número de usuários
-- Time vencedor sempre vai para o time vermelho
-- Modo de treino quando há apenas um jogador esperando
-- Suporte para múltiplos estádios (1x1, 2x2, 3x3, 4x4)
+### 🎮 Para Jogadores
+- ✅ **Registro automático** ao entrar no servidor
+- ✅ **Role de Player** atribuída automaticamente
+- ✅ **Sistema de Tickets** para suporte
+- ✅ **Perfil de jogador** com estatísticas
+- ✅ **Comandos informativos** sobre salas e status
+- ✅ **Registro de Auth do Haxball** para rastreamento
 
-### 🛡️ Moderação Automática
-- Expulsa jogadores AFK automaticamente
-- Bane jogadores com palavrões no nome ou mensagens
-- Detecta e expulsa spammers
-- Impede múltiplas conexões do mesmo IP
-- Sistema de admin com permissões especiais
+### 👑 Para Administradores
+- ✅ **Comandos de moderação** (ban, kick)
+- ✅ **Sistema de anúncios**
+- ✅ **Gerenciamento de tickets**
+- ✅ **Monitoramento de salas** em tempo real
+- ✅ **Estatísticas do servidor**
 
-### 👑 Comandos de Admin
-- `!kick <nome/id> [motivo]` - Expulsar jogador
-- `!ban <nome/id> [motivo]` - Banir jogador
-- `!mute <nome/id>` - Silenciar jogador
-- `!clearbans` - Limpar todos os bans
-- `!rr` - Reiniciar partida
-- `!pause` - Pausar partida
-- `!unpause` - Despausar partida
-- `!swap <nome/id>` - Trocar jogador de time
-- `!setadmin <nome/id>` - Dar admin para jogador
-- `!removeadmin <nome/id>` - Remover admin de jogador
-
-### 💬 Comandos de Jogadores
-- `!help` - Ver lista de comandos
-- `!discord` - Ver link do Discord
-- `!regras` - Ver regras da sala
-- `!stats` - Ver estatísticas da sala
-- `!afk` - Marcar-se como AFK
-- `!bb` - Sair da sala
-- `!github` - Ver repositório do código
-
-### 🔔 Integração com Discord
-- Notificações quando jogadores entram/saem
-- Resultados de partidas enviados automaticamente
-- Logs de ações administrativas
-- Embeds personalizados e coloridos
-
-### 🎨 Mensagens Personalizadas
-- Boas-vindas estilizadas para novos jogadores
-- Convites para o Discord
-- Anúncios de gols e vitórias
-- Mensagens de admin destacadas
+### 🎫 Sistema de Tickets
+- ✅ **Criação automática** de canais privados
+- ✅ **Permissões configuradas** automaticamente
+- ✅ **Botão para fechar** ticket
+- ✅ **Histórico de tickets** salvo
 
 ---
 
 ## 🚀 Instalação
 
-### Requisitos
-- Node.js 18+ 
-- npm ou pnpm
-- Token do Haxball Headless (https://haxball.com/headlesstoken)
+### 1. Criar o Bot no Discord
 
-### Passo a Passo
+1. Acesse: https://discord.com/developers/applications
+2. Clique em **"New Application"**
+3. Dê um nome: **"Arena Cup Manager"**
+4. Vá em **"Bot"** no menu lateral
+5. Clique em **"Add Bot"**
+6. Ative as seguintes **Privileged Gateway Intents**:
+   - ✅ Presence Intent
+   - ✅ Server Members Intent
+   - ✅ Message Content Intent
+7. Copie o **Token** (guarde com segurança!)
 
-1. **Clone o repositório**
+### 2. Convidar o Bot para o Servidor
+
+1. Vá em **"OAuth2" > "URL Generator"**
+2. Selecione os **Scopes**:
+   - `bot`
+   - `applications.commands`
+3. Selecione as **Permissions**:
+   - Administrator (ou configure manualmente as permissões abaixo)
+   
+**Permissões Necessárias:**
+- Manage Channels
+- Manage Roles
+- Manage Webhooks
+- Kick Members
+- Ban Members
+- Send Messages
+- Manage Messages
+- Embed Links
+- Attach Files
+- Read Message History
+- Add Reactions
+- Use Slash Commands
+
+4. Copie a URL gerada e abra no navegador
+5. Selecione seu servidor e autorize
+
+### 3. Configurar o Servidor Discord
+
+#### Criar Role "Player"
+1. Configurações do Servidor > Roles
+2. Criar nova role: **"Player"**
+3. Copiar o ID da role (clique direito > Copiar ID)
+
+#### Criar Categoria "Tickets"
+1. Criar nova categoria: **"🎫 TICKETS"**
+2. Configurar permissões:
+   - @everyone: ❌ Ver Canal
+   - @Admin: ✅ Ver Canal
+   - Bot: ✅ Ver Canal
+3. Copiar o ID da categoria
+
+#### Criar Canal de Boas-Vindas (Opcional)
+1. Criar canal: **"#bem-vindos"** ou **"#geral"**
+2. O bot enviará mensagens de boas-vindas aqui
+
+### 4. Instalar Dependências
+
 ```bash
-git clone https://github.com/gustavobbrz/server.git
-cd server
-```
-
-2. **Instale as dependências**
-```bash
+cd discord-bot
 npm install
-# ou
-pnpm install
 ```
 
-3. **Configure o token do Haxball**
-Edite o arquivo `token.txt` e cole seu token:
-```bash
-echo "SEU_TOKEN_AQUI" > token.txt
-```
+### 5. Configurar Variáveis de Ambiente
 
-4. **Configure os webhooks do Discord (opcional)**
 ```bash
 cp .env.example .env
-# Edite o arquivo .env com seus webhooks
+nano .env
 ```
 
-5. **Configure a lista de admins**
-Edite `lists/adminlist.txt` e adicione os IDs públicos dos admins (um por linha):
-```
-AUTH_ID_ADMIN_1
-AUTH_ID_ADMIN_2
+Preencha com suas informações:
+
+```env
+DISCORD_BOT_TOKEN=seu_token_do_bot_aqui
+DISCORD_GUILD_ID=id_do_servidor_aqui
+PLAYER_ROLE_ID=id_da_role_player_aqui
+TICKETS_CATEGORY_ID=id_da_categoria_tickets_aqui
 ```
 
-6. **Compile o TypeScript**
+### 6. Iniciar o Bot
+
 ```bash
-npm run build
+npm start
 ```
 
-7. **Inicie uma sala**
+Ou com auto-reload (desenvolvimento):
+
 ```bash
-# Sala X3 NIVEL
-./start-x3-nivel.sh
-
-# Sala X3 NOOBS
-./start-x3-noobs.sh
-
-# Sala X1
-./start-x1.sh
-
-# Sala X4
-./start-x4.sh
+npm run dev
 ```
 
 ---
 
-## 🐳 Deploy no Pterodactyl
+## 📋 Comandos Disponíveis
 
-### Configuração no Painel
+### 🎮 Comandos de Jogador
 
-1. **Criar 4 servidores** (um para cada sala)
+| Comando | Descrição | Exemplo |
+|---------|-----------|---------|
+| `!ajuda` | Mostra lista de comandos | `!ajuda` |
+| `!status` | Ver status das salas | `!status` |
+| `!salas` | Ver informações das salas | `!salas` |
+| `!perfil [@usuario]` | Ver perfil de jogador | `!perfil @João` |
+| `!registrar <auth>` | Registrar Auth do Haxball | `!registrar abc123...` |
+| `!stats` | Ver estatísticas gerais | `!stats` |
+| `!ticket <mensagem>` | Abrir ticket de suporte | `!ticket Preciso de ajuda` |
+| `!fecharticket` | Fechar ticket (dentro do canal) | `!fecharticket` |
 
-2. **Configurar cada servidor:**
-   - **Docker Image:** `ghcr.io/parkervcp/yolks:nodejs_18`
-   - **Startup Command:** `./start-x3-nivel.sh` (ajustar para cada sala)
-   - **Working Directory:** `/home/container`
+### 👑 Comandos de Admin
 
-3. **Variáveis de Ambiente:**
+| Comando | Descrição | Exemplo |
+|---------|-----------|---------|
+| `!ban @usuario <motivo>` | Banir usuário | `!ban @Troll Spam` |
+| `!kick @usuario <motivo>` | Expulsar usuário | `!kick @Troll Comportamento` |
+| `!anuncio <mensagem>` | Fazer anúncio oficial | `!anuncio Manutenção às 20h` |
+
+---
+
+## 🎫 Como Funciona o Sistema de Tickets
+
+### Para Jogadores
+
+1. **Abrir Ticket:**
    ```
-   ROOM_TYPE=x3-nivel
-   WEBHOOK_X3_NIVEL=https://discord.com/api/webhooks/...
+   !ticket Preciso de ajuda com ban
    ```
 
-4. **Upload dos arquivos:**
-   - Faça upload de todo o conteúdo do repositório
-   - Certifique-se de que o `token.txt` está configurado
-   - Verifique se os scripts `.sh` têm permissão de execução
+2. **Um canal privado será criado:**
+   - Nome: `ticket-seunome`
+   - Apenas você, admins e o bot podem ver
+   - Botão para fechar ticket
 
-5. **Iniciar os servidores**
+3. **Conversar com a equipe:**
+   - Explique seu problema
+   - Aguarde resposta da equipe
 
-### Estrutura de Diretórios no Pterodactyl
-```
-/home/container/
-├── dist/                 # Código compilado
-├── lists/               # Listas de admin e palavrões
-├── stadiums/            # Mapas do Haxball
-├── token.txt            # Token do Haxball
-├── start-x3-nivel.sh    # Script de inicialização
-├── start-x3-noobs.sh
-├── start-x1.sh
-├── start-x4.sh
-└── package.json
+4. **Fechar Ticket:**
+   - Clique no botão "Fechar Ticket"
+   - Ou digite: `!fecharticket`
+
+### Para Admins
+
+1. **Ver tickets ativos:**
+   - Vá até a categoria "🎫 TICKETS"
+   - Todos os tickets abertos estarão lá
+
+2. **Atender ticket:**
+   - Entre no canal do ticket
+   - Converse com o jogador
+
+3. **Fechar ticket:**
+   - Clique no botão "Fechar Ticket"
+   - Ou digite: `!fecharticket`
+
+---
+
+## 🔄 Registro Automático de Players
+
+### Como Funciona
+
+1. **Novo membro entra no servidor**
+   - Bot detecta automaticamente
+   - Atribui role "Player"
+   - Registra no banco de dados
+   - Envia mensagem de boas-vindas
+
+2. **Mensagem de Boas-Vindas**
+   - Enviada no canal de boas-vindas
+   - Enviada por DM para o usuário
+   - Contém informações sobre salas e comandos
+
+3. **Registro de Auth do Haxball**
+   - Jogador usa: `!registrar <auth>`
+   - Auth é salvo no banco de dados
+   - Permite rastreamento de estatísticas
+
+### Como Obter o Auth do Haxball
+
+1. Entre em uma sala do Haxball
+2. Abra o console (F12)
+3. Digite qualquer comando no chat
+4. Copie o Auth que aparece no console
+5. Use: `!registrar <auth_copiado>`
+
+---
+
+## 📊 Monitoramento de Salas
+
+O bot monitora o status das salas a cada 30 segundos:
+
+- 🟢 **Online** - Sala funcionando
+- 🔴 **Offline** - Sala fora do ar
+- 👥 **Jogadores** - Quantidade atual/máxima
+
+Use `!status` para ver em tempo real.
+
+---
+
+## 🗄️ Banco de Dados
+
+O bot salva dados em `bot-data.json`:
+
+```json
+{
+  "registeredPlayers": {
+    "user_id": {
+      "username": "João#1234",
+      "joinedAt": "2026-01-28T...",
+      "haxballAuth": "abc123...",
+      "stats": {
+        "gamesPlayed": 0,
+        "wins": 0,
+        "losses": 0
+      }
+    }
+  },
+  "activeTickets": {
+    "channel_id": {
+      "userId": "user_id",
+      "channelId": "channel_id",
+      "reason": "Preciso de ajuda",
+      "createdAt": "2026-01-28T..."
+    }
+  },
+  "roomStatus": {
+    "x3-nivel": {
+      "online": true,
+      "players": 15,
+      "maxPlayers": 30
+    }
+  }
+}
 ```
 
 ---
 
-## 🔧 Configuração Avançada
+## 🔧 Integração com Salas Haxball
 
-### Personalizar Link do Discord
-Edite o arquivo `config.ts` e altere os links:
+Para integrar o bot com as salas Haxball, você pode:
+
+### 1. Adicionar Webhooks para Chat da Sala
+
+No arquivo `config.ts` das salas:
+
 ```typescript
-discordLink: "https://discord.gg/SEU_CONVITE"
+webhooks: {
+  join: process.env.WEBHOOK_X3_NIVEL_JOIN || "",
+  leave: process.env.WEBHOOK_X3_NIVEL_LEAVE || "",
+  game: process.env.WEBHOOK_X3_NIVEL_GAME || "",
+  admin: process.env.WEBHOOK_X3_NIVEL_ADMIN || "",
+  chat: process.env.WEBHOOK_X3_NIVEL_CHAT || ""  // Novo!
+}
 ```
 
-### Adicionar/Remover Palavrões
-Edite `lists/badwords.txt` (uma palavra por linha)
+### 2. Enviar Mensagens do Chat para o Discord
 
-### Ajustar Limites de Tempo/Gols
-Edite `config.ts`:
+No arquivo `index.ts`:
+
 ```typescript
-scoreLimit: 3,  // Gols para vencer
-timeLimit: 3,   // Minutos de partida
-```
-
-### Modificar Mapas
-Coloque seus arquivos `.hbs` na pasta `stadiums/`
-
----
-
-## 📊 Estrutura do Projeto
-
-```
-server/
-├── index.ts              # Arquivo principal
-├── config.ts             # Configurações das salas
-├── commands.ts           # Comandos de jogadores
-├── admincommands.ts      # Comandos de admin
-├── discord.ts            # Integração com Discord
-├── playerjoining.ts      # Lógica de entrada de jogadores
-├── playerleaving.ts      # Lógica de saída de jogadores
-├── teammanagement.ts     # Gerenciamento de times
-├── moderation.ts         # Sistema de moderação
-├── afkdetection.ts       # Detecção de AFK
-├── lists/
-│   ├── adminlist.txt     # IDs de admins
-│   └── badwords.txt      # Lista de palavrões
-└── stadiums/
-    ├── practice.hbs      # Mapa de treino
-    ├── futsal2x2.hbs     # Mapa 2x2
-    └── futsal3x3.hbs     # Mapa 3x3
+room.onPlayerChat = function (player: PlayerObject, message: string): boolean {
+  // Enviar para Discord
+  if (config.webhooks && config.webhooks.chat) {
+    sendDiscordWebhook(config.webhooks.chat, {
+      content: `**${player.name}:** ${message}`
+    });
+  }
+  
+  // ... resto do código
+}
 ```
 
 ---
 
-## 🎯 Como Obter o Auth ID para Admin
+## 🛠️ Manutenção
 
-1. Entre na sala do Haxball
-2. Digite no chat: `/avatar` (qualquer comando funciona)
-3. Copie o Auth ID que aparece no console do navegador (F12)
-4. Cole o Auth ID no arquivo `lists/adminlist.txt`
+### Backup dos Dados
+
+```bash
+cp bot-data.json bot-data.backup.json
+```
+
+### Limpar Tickets Antigos
+
+Os tickets são deletados automaticamente ao serem fechados.
+
+### Ver Logs
+
+```bash
+# Se estiver rodando com pm2
+pm2 logs arena-cup-bot
+
+# Se estiver rodando com systemd
+journalctl -u arena-cup-bot -f
+```
 
 ---
 
-## 🔗 Links Úteis
+## 🚀 Deploy em Produção
 
-- **Haxball Headless Token:** https://haxball.com/headlesstoken
-- **Documentação Haxball.js:** https://github.com/mertushka/haxball.js
-- **Discord Webhooks:** https://support.discord.com/hc/en-us/articles/228383668
+### Usando PM2
+
+```bash
+npm install -g pm2
+pm2 start bot.js --name arena-cup-bot
+pm2 save
+pm2 startup
+```
+
+### Usando Systemd
+
+Criar arquivo `/etc/systemd/system/arena-cup-bot.service`:
+
+```ini
+[Unit]
+Description=Arena Cup Discord Bot
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/server/discord-bot
+ExecStart=/usr/bin/node bot.js
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Ativar:
+
+```bash
+sudo systemctl enable arena-cup-bot
+sudo systemctl start arena-cup-bot
+sudo systemctl status arena-cup-bot
+```
 
 ---
 
-## 📝 Licença
+## ⚠️ Solução de Problemas
+
+### Bot não responde a comandos
+
+- ✅ Verifique se o **Message Content Intent** está ativado
+- ✅ Verifique se o bot tem permissão de ler mensagens
+- ✅ Verifique os logs do bot
+
+### Tickets não são criados
+
+- ✅ Verifique se `TICKETS_CATEGORY_ID` está correto
+- ✅ Verifique se o bot tem permissão de criar canais
+- ✅ Verifique se a categoria existe
+
+### Role não é atribuída automaticamente
+
+- ✅ Verifique se `PLAYER_ROLE_ID` está correto
+- ✅ Verifique se o bot tem permissão de gerenciar roles
+- ✅ Verifique se a role do bot está acima da role "Player"
+
+### Bot desconecta constantemente
+
+- ✅ Verifique sua conexão com a internet
+- ✅ Verifique se o token está correto
+- ✅ Verifique os logs para erros
+
+---
+
+## 🔒 Segurança
+
+**⚠️ IMPORTANTE:**
+
+- ❌ **NUNCA** compartilhe seu token do bot
+- ❌ **NUNCA** faça commit do arquivo `.env`
+- ✅ Adicione `.env` ao `.gitignore`
+- ✅ Use variáveis de ambiente em produção
+- ✅ Regenere o token se ele vazar
+
+---
+
+## 📞 Suporte
+
+Se tiver problemas:
+
+1. Verifique os logs do bot
+2. Consulte a documentação do Discord.js: https://discord.js.org
+3. Verifique as permissões do bot
+4. Teste em um servidor de desenvolvimento primeiro
+
+---
+
+## 📝 Changelog
+
+### v1.0.0 (28/01/2026)
+- ✅ Sistema de tickets completo
+- ✅ Registro automático de players
+- ✅ Comandos de administração
+- ✅ Monitoramento de salas
+- ✅ Sistema de perfis e estatísticas
+- ✅ Integração com Haxball Auth
+
+---
+
+## 📄 Licença
 
 MIT License - Sinta-se livre para usar e modificar!
 
 ---
 
-## 🤝 Contribuindo
-
-Pull requests são bem-vindos! Para mudanças grandes, abra uma issue primeiro para discutir o que você gostaria de mudar.
-
----
-
-## 💡 Suporte
-
-Se tiver problemas ou dúvidas:
-1. Abra uma issue no GitHub
-2. Entre no Discord da comunidade
-3. Verifique os logs do servidor
-
----
-
-**Desenvolvido com ❤️ para a comunidade Haxball brasileira 🇧🇷**
+**Desenvolvido com ❤️ para a comunidade Arena Cup 🇧🇷**
