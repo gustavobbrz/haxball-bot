@@ -1,0 +1,131 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.isCommand = exports.checkAndHandleCommands = void 0;
+const index_js_1 = require("./index.js");
+const config_js_1 = require("./config.js");
+const admincommands_js_1 = require("./admincommands.js");
+const commands = [
+    {
+        name: "help",
+        description: "mostrar a lista dos comandos e respectivas funções",
+        emoji: "❓",
+        adminOnly: false,
+        response: (player) => {
+            sendBoldWhiteAnnouncement("═══════════════════════════════", player.id);
+            sendBoldWhiteAnnouncement("📋 COMANDOS DISPONÍVEIS:", player.id);
+            sendBoldWhiteAnnouncement("═══════════════════════════════", player.id);
+            commands.forEach((command) => {
+                if (command.adminOnly && !player.admin)
+                    return;
+                sendBoldWhiteAnnouncement(`${command.emoji} !${command.name}: ${command.description}`, player.id);
+            });
+            if (player.admin) {
+                sendBoldWhiteAnnouncement("", player.id);
+                sendBoldWhiteAnnouncement("👑 COMANDOS DE ADMIN:", player.id);
+                const adminCmds = (0, admincommands_js_1.getAdminCommandsList)();
+                adminCmds.forEach(cmd => sendBoldWhiteAnnouncement(cmd, player.id));
+            }
+            sendBoldWhiteAnnouncement("═══════════════════════════════", player.id);
+        }
+    },
+    {
+        name: "discord",
+        description: "mostrar o link do servidor do Discord",
+        emoji: "💬",
+        adminOnly: false,
+        response: (player) => {
+            const config = (0, config_js_1.getRoomConfig)();
+            sendBoldWhiteAnnouncement("═══════════════════════════════", player.id);
+            sendBoldWhiteAnnouncement("💬 JUNTE-SE AO NOSSO DISCORD!", player.id);
+            sendBoldWhiteAnnouncement(`🔗 ${config.discordLink}`, player.id);
+            sendBoldWhiteAnnouncement("Venha conversar, fazer amigos e participar de eventos!", player.id);
+            sendBoldWhiteAnnouncement("═══════════════════════════════", player.id);
+        }
+    },
+    {
+        name: "github",
+        description: "mostrar o link para o repositório da sala",
+        emoji: "👨‍💻",
+        adminOnly: false,
+        response: (player) => {
+            sendBoldWhiteAnnouncement("👨‍💻 O código desta sala é open source: github.com/gustavobbrz/server", player.id);
+        }
+    },
+    {
+        name: "bb",
+        description: "sair da sala",
+        emoji: "👋",
+        adminOnly: false,
+        response: (player) => {
+            index_js_1.room.sendAnnouncement(`👋 ${player.name} saiu da sala. Até logo!`, null, 0xFFFF00, "bold", 1);
+            index_js_1.room.kickPlayer(player.id, "Comando !bb", false);
+        }
+    },
+    {
+        name: "regras",
+        description: "mostrar as regras da sala",
+        emoji: "📜",
+        adminOnly: false,
+        response: (player) => {
+            sendBoldWhiteAnnouncement("═══════════════════════════════", player.id);
+            sendBoldWhiteAnnouncement("📜 REGRAS DA SALA:", player.id);
+            sendBoldWhiteAnnouncement("═══════════════════════════════", player.id);
+            sendBoldWhiteAnnouncement("1️⃣ Respeite todos os jogadores", player.id);
+            sendBoldWhiteAnnouncement("2️⃣ Não use palavrões ou linguagem ofensiva", player.id);
+            sendBoldWhiteAnnouncement("3️⃣ Não faça spam no chat", player.id);
+            sendBoldWhiteAnnouncement("4️⃣ Não fique AFK (ausente) durante as partidas", player.id);
+            sendBoldWhiteAnnouncement("5️⃣ Jogue limpo e divirta-se!", player.id);
+            sendBoldWhiteAnnouncement("═══════════════════════════════", player.id);
+        }
+    },
+    {
+        name: "afk",
+        description: "marcar-se como AFK e ir para espectadores",
+        emoji: "😴",
+        adminOnly: false,
+        response: (player) => {
+            index_js_1.room.setPlayerTeam(player.id, 0);
+            index_js_1.room.sendAnnouncement(`😴 ${player.name} está AFK.`, null, 0xFFFF00, "normal", 1);
+        }
+    },
+    {
+        name: "stats",
+        description: "ver estatísticas da sala",
+        emoji: "📊",
+        adminOnly: false,
+        response: (player) => {
+            const players = index_js_1.room.getPlayerList();
+            const redTeam = players.filter(p => p.team === 1);
+            const blueTeam = players.filter(p => p.team === 2);
+            const specs = players.filter(p => p.team === 0);
+            sendBoldWhiteAnnouncement("═══════════════════════════════", player.id);
+            sendBoldWhiteAnnouncement("📊 ESTATÍSTICAS DA SALA:", player.id);
+            sendBoldWhiteAnnouncement("═══════════════════════════════", player.id);
+            sendBoldWhiteAnnouncement(`👥 Total de jogadores: ${players.length}`, player.id);
+            sendBoldWhiteAnnouncement(`🔴 Time Vermelho: ${redTeam.length}`, player.id);
+            sendBoldWhiteAnnouncement(`🔵 Time Azul: ${blueTeam.length}`, player.id);
+            sendBoldWhiteAnnouncement(`👁️ Espectadores: ${specs.length}`, player.id);
+            sendBoldWhiteAnnouncement("═══════════════════════════════", player.id);
+        }
+    }
+];
+function checkAndHandleCommands(player, message) {
+    if (!isCommand(message))
+        return false;
+    const commandMessage = message.substring(1).toLowerCase();
+    const command = commands.find((command) => command.name === commandMessage);
+    if (!command) {
+        index_js_1.room.sendAnnouncement("🚫 Esse comando não existe. Digite !help para ver a lista de comandos.", player.id, 0xFF0000, "bold", 0);
+        return true;
+    }
+    command.response(player);
+    return true;
+}
+exports.checkAndHandleCommands = checkAndHandleCommands;
+function isCommand(message) {
+    return (message !== "!" && message.startsWith("!"));
+}
+exports.isCommand = isCommand;
+function sendBoldWhiteAnnouncement(message, playerId) {
+    index_js_1.room.sendAnnouncement(message, playerId, 0xFFFFFF, "bold", 0);
+}

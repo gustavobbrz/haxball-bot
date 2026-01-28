@@ -1,37 +1,24 @@
 {
-  "name": "haxball-bot-pterodactyl",
-  "version": "2.0.0",
-  "description": "Sistema completo de gerenciamento de salas Haxball com API REST para Pterodactyl Panel",
-  "main": "index.js",
-  "author": "Seu Nome",
-  "license": "MIT",
+  "name": "simplehaxballfutsal",
+  "version": "1.0.0",
+  "description": "Simple 1x1/2x2/3x3 futsal script for Haxball Headless Host (and for deploying with haxball.js).",
+  "main": "dist/index.js",
   "scripts": {
-    "start": "node index.js",
-    "cli": "node scripts/cli.js",
-    "criar-sala": "node scripts/cli.js criar-sala",
-    "listar-salas": "node scripts/cli.js listar-salas",
-    "dev": "nodemon index.js"
+    "build": "npx tsc",
+    "start": "node dist/index.js"
   },
   "keywords": [
     "haxball",
-    "game",
-    "bot",
-    "pterodactyl",
-    "api",
-    "rest"
+    "futsal",
+    "haxball.js"
   ],
+  "author": "DazzDev",
+  "license": "MIT",
   "dependencies": {
-    "haxball.js": "^3.0.0",
-    "express": "^4.18.2",
-    "node-fetch": "^2.6.7",
-    "form-data": "^4.0.0",
-    "buffer": "^6.0.3",
-    "dotenv": "^16.0.0"
+    "haxball.js": "^2.1.2"
   },
   "devDependencies": {
-    "nodemon": "^3.0.1"
-  },
-  "engines": {
-    "node": ">=14.0.0"
+    "@types/node": "^18.13.0",
+    "typescript": "^4.9.5"
   }
 }
